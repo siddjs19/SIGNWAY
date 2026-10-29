@@ -1,11 +1,21 @@
 import { useCallback, useEffect, useState } from 'react';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
+import QuizPage from './pages/QuizPage';
 import api, { clearStoredToken, getStoredToken } from './services/api';
 import authService from './services/authService';
 
 export default function App() {
+  return (
+    <BrowserRouter>
+      <SignBridgeApplication />
+    </BrowserRouter>
+  );
+}
+
+function SignBridgeApplication() {
   const [authView, setAuthView] = useState('login');
   const [currentUser, setCurrentUser] = useState(null);
   const [checkingSession, setCheckingSession] = useState(true);
@@ -57,7 +67,15 @@ export default function App() {
   }
 
   if (currentUser) {
-    return <Dashboard user={currentUser} onLogout={handleLogout} />;
+    return (
+      <Routes>
+        <Route path="/" element={<Dashboard user={currentUser} onLogout={handleLogout} />} />
+        <Route path="/quiz" element={<QuizPage onLogout={handleLogout} />} />
+        <Route path="/quiz/lesson/:lessonId" element={<QuizPage onLogout={handleLogout} />} />
+        <Route path="/quiz/full-course" element={<QuizPage onLogout={handleLogout} />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    );
   }
 
   return authView === 'login' ? (

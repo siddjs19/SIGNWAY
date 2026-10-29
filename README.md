@@ -19,7 +19,7 @@ Set `FRONTEND_URL` in the backend to the exact frontend origin. Multiple allowed
 
 For production builds, run `npm run build` in `frontend/`; run the backend with `npm start` in `backend/`. Both applications must be deployed and configured separately.
 
-Lesson records can be seeded without deleting existing data with `npm run seed` from `backend/`. The included sample is unpublished and explicitly unverified; it is not shown to learners.
+Lesson records can be seeded without deleting existing data with `npm run seed` from `backend/`. The script uses insert-only upserts. The existing sample remains unpublished; three additional ISLRTC lesson drafts and source-check quizzes are also inserted unpublished pending qualified review.
 
 Run the backend API integration test with `npm test` from `backend/`. Run `npm run lint` and `npm run build` from `frontend/`.
 
@@ -46,6 +46,7 @@ Profile responses use `profile`; progress responses use `progress`; lesson and q
 ## Content and feature status
 
 - Lesson content is stored in the `Lesson` model and only published records are shown. A `verified` flag in stored content is shown as a moderation marker, not as an independent claim that the sign instruction is correct. The included seed content is unpublished and must be replaced with educator-reviewed ISL material before publishing.
+- The first three beginner lessons reference ISLRTC’s [Basic Communication Skills in Indian Sign Language playlist](https://www.youtube.com/playlist?list=PLFjydPMg4DapfRTBMokl09Ht-fhMOAYf6). Public playlist-feed metadata and YouTube oEmbed title/availability/embeddability were checked on 2026-10-29. Linked video titles are **Guideline** (`5PF6JXzYyUI`), **Module 1.2 Greeting and salutations in Indian Sign Language** (`5vHmvYA8Z6Q`), **Module 1.3 Some polite useful phrases.** (`neE5Fg4FVtA`), and **Module 2.2 Introducing oneself (name, work, place, etc.)** (`mc_NxVJlhi8`). The player uses YouTube’s confirmed embed URL and always links to the original video and playlist with ISLRTC attribution. This metadata check does not verify video contents, individual sign demonstrations, or SignBridge-written explanations and quiz questions. The seed script inserts these lessons and quizzes unpublished. Publishing a local development record for UI testing does not change its pending review status or establish qualified ISL review.
 - Quizzes use the `Quiz` and `QuizAttempt` models. Correct answers are omitted from quiz-loading responses and included only in grading results after submission.
 - Lesson completion is stored once per user/lesson in `LessonCompletion`; progress totals are calculated from published lessons and those records.
 - Webcam recognition/translation, community matching, and blockchain credentials are not implemented. Their UI pages are clearly marked unavailable and describe implementation constraints rather than claiming capability.
@@ -54,3 +55,7 @@ Profile responses use `profile`; progress responses use `progress`; lesson and q
 
 - **Phase 3 — recognition and communication:** Begin with an explicitly supported, limited vocabulary and communicate measured limitations. Do not claim unrestricted ISL translation. Ask for explicit consent before camera access or any third-party processing; do not send frames or conversations externally by default.
 - **Phase 4 — verifiable credentials:** Keep personal information and conversations off-chain. Store only the minimum credential proof or hash needed for verification.
+
+### Quiz assessments
+
+The assessment center is available at `/quiz`; lesson quizzes use `/quiz/lesson/:lessonId`. Full-course overview, question loading, and attempt submission use authenticated `/quizzes/full-course`, `/quizzes/full-course/questions`, and `/quizzes/full-course/attempts` endpoints. The backend builds one test from published quizzes attached to published lessons, interleaves questions across lessons, and requires at least five questions across two lessons. It grades at a 70% pass threshold and stores attempts with lesson-level breakdowns. No time limit or attempt restriction is configured.

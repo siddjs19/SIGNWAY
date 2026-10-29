@@ -2,38 +2,312 @@ const express = require('express');
 const mongoose = require('mongoose');
 const Quiz = require('../models/Quiz');
 const QuizAttempt = require('../models/QuizAttempt');
+const Lesson = require('../models/Lesson');
 const auth = require('../middleware/auth');
 
 const router = express.Router();
+const COURSE_PASSING_SCORE = 70;
+const MINIMUM_COURSE_QUESTIONS = 5;
+const MINIMUM_COURSE_LESSONS = 2;
 
 router.use(auth);
 
-// List published quizzes for a lesson without exposing answer keys.
+async function getCourseAssessment() {
+  const lessons = await Lesson.find({ published: true })
+    .select('_id title order')
+    .sort({ order: 1 })
+    .lean();
+  const lessonById = new Map(lessons.map(lesson => [String(lesson._id), lesson]));
+
+  if (lessons.length === 0) {
+    return { questions: [], lessons: [], quizzes: [] };
+  }
+
+  const quizzes = await Quiz.find({
+    published: true,
+    lesson: { $in: lessons.map(lesson => lesson._id) },
+  })
+    .select('_id lesson title questions')
+    .sort({ createdAt: 1 })
+    .lean();
+  const questionsByLesson = new Map();
+
+  for (const quiz of quizzes) {
+    const lesson = lessonById.get(String(quiz.lesson));
+    if (!lesson) continue;
+
+    const lessonQuestions = questionsByLesson.get(String(lesson._id)) || [];
+    for (const question of quiz.questions || []) {
+      lessonQuestions.push({
+        _id: question._id,
+        quizId: quiz._id,
+        lessonId: lesson._id,
+        lessonTitle: lesson.title,
+        prompt: question.prompt,
+        mediaUrl: question.mediaUrl || '',
+        options: question.options,
+        correctAnswer: question.correctAnswer,
+        explanation: question.explanation || '',
+      });
+    }
+    questionsByLesson.set(String(lesson._id), lessonQuestions);
+  }
+
+  const questions = [];
+  let hasMore = true;
+  while (hasMore) {
+    hasMore = false;
+    for (const lesson of lessons) {
+      const lessonQuestions = questionsByLesson.get(String(lesson._id)) || [];
+      if (lessonQuestions.length > 0) {
+        questions.push(lessonQuestions.shift());
+        hasMore = true;
+      }
+    }
+  }
+
+  const coveredLessons = [...new Set(questions.map(question => String(question.lessonId)))];
+  return {
+    questions,
+    lessons: lessons.filter(lesson => coveredLessons.includes(String(lesson._id))),
+    quizzes,
+  };
+}
+
+function isCourseAvailable(assessment) {
+  return assessment.questions.length >= MINIMUM_COURSE_QUESTIONS
+    && assessment.lessons.length >= MINIMUM_COURSE_LESSONS;
+}
+
+function courseUnavailableReason(assessment) {
+  const needed = [];
+  if (assessment.questions.length < MINIMUM_COURSE_QUESTIONS) {
+    needed.push(`at least ${MINIMUM_COURSE_QUESTIONS} published questions`);
+  }
+  if (assessment.lessons.length < MINIMUM_COURSE_LESSONS) {
+    needed.push(`published questions from at least ${MINIMUM_COURSE_LESSONS} lessons`);
+  }
+  return `The full-course test needs ${needed.join(' and ')}. The current published question pool has ${assessment.questions.length} questions across ${assessment.lessons.length} lessons.`;
+}
+
+function questionForLearner(question) {
+  return {
+    _id: question._id,
+    quizId: question.quizId,
+    lessonId: question.lessonId,
+    lessonTitle: question.lessonTitle,
+    prompt: question.prompt,
+    mediaUrl: question.mediaUrl,
+    options: question.options,
+  };
+}
+
+function validateSubmittedAnswers(questions, submitted) {
+  if (!Array.isArray(submitted)) {
+    return 'Answers must be an array';
+  }
+
+  const questionIds = questions.map(question => String(question._id));
+  if (
+    submitted.length !== questionIds.length
+    || submitted.some(answer => !answer || !questionIds.includes(String(answer.questionId)))
+    || new Set(submitted.map(answer => String(answer.questionId))).size !== questionIds.length
+  ) {
+    return 'Submit exactly one answer for every question';
+  }
+
+  if (submitted.some(answer => {
+    const question = questions.find(item => String(item._id) === String(answer.questionId));
+    return typeof answer.selectedAnswer !== 'string'
+      || !question.options.includes(answer.selectedAnswer);
+  })) {
+    return 'Each answer must select one of the question options';
+  }
+
+  return null;
+}
+
+function gradeAnswers(questions, submitted) {
+  return questions.map(question => {
+    const response = submitted.find(
+      answer => String(answer.questionId) === String(question._id),
+    );
+    return {
+      questionId: question._id,
+      selectedAnswer: response.selectedAnswer,
+      isCorrect: response.selectedAnswer === question.correctAnswer,
+      correctAnswer: question.correctAnswer,
+      explanation: question.explanation || '',
+    };
+  });
+}
+
+// List published quizzes linked only to published lessons.
 router.get('/', async (req, res) => {
   try {
-    const filter = { published: true };
-
+    let lessons;
     if (req.query.lessonId !== undefined) {
       if (!mongoose.isValidObjectId(req.query.lessonId)) {
         return res.status(400).json({ message: 'Invalid lesson ID' });
       }
-
-      filter.lesson = req.query.lessonId;
+      const lesson = await Lesson.findOne({
+        _id: req.query.lessonId,
+        published: true,
+      }).select('_id title');
+      if (!lesson) {
+        return res.status(404).json({ message: 'Published lesson not found' });
+      }
+      lessons = [lesson];
+    } else {
+      lessons = await Lesson.find({ published: true })
+        .select('_id title order')
+        .sort({ order: 1 })
+        .lean();
     }
 
-    const quizzes = await Quiz.find(filter)
-      .select('title lesson')
+    const lessonById = new Map(lessons.map(lesson => [String(lesson._id), lesson]));
+    const quizzes = await Quiz.find({
+      published: true,
+      lesson: { $in: lessons.map(lesson => lesson._id) },
+    })
+      .select('title lesson questions')
       .sort({ createdAt: 1 })
       .lean();
 
-    return res.json({ success: true, data: quizzes });
+    return res.json({
+      success: true,
+      data: quizzes
+        .filter(quiz => lessonById.has(String(quiz.lesson)))
+        .map(quiz => ({
+          _id: quiz._id,
+          title: quiz.title,
+          lesson: quiz.lesson,
+          lessonTitle: lessonById.get(String(quiz.lesson)).title,
+          questionCount: quiz.questions.length,
+        })),
+    });
   } catch (error) {
     console.error('List quizzes error:', error.message);
     return res.status(500).json({ message: 'Could not load quizzes' });
   }
 });
 
-// Fetch quiz questions without answer keys
+router.get('/full-course', async (req, res) => {
+  try {
+    const assessment = await getCourseAssessment();
+    const available = isCourseAvailable(assessment);
+
+    return res.json({
+      success: true,
+      data: {
+        available,
+        title: 'Full-course test',
+        scope: 'Published lessons with published quizzes',
+        questionCount: assessment.questions.length,
+        lessonCount: assessment.lessons.length,
+        lessons: assessment.lessons.map(({ _id, title }) => ({ _id, title })),
+        passingScore: COURSE_PASSING_SCORE,
+        ...(available ? {} : { reason: courseUnavailableReason(assessment) }),
+      },
+    });
+  } catch (error) {
+    console.error('Load full-course test error:', error.message);
+    return res.status(500).json({ message: 'Could not load the full-course test' });
+  }
+});
+
+router.get('/full-course/questions', async (req, res) => {
+  try {
+    const assessment = await getCourseAssessment();
+    if (!isCourseAvailable(assessment)) {
+      return res.status(409).json({
+        success: false,
+        message: courseUnavailableReason(assessment),
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        title: 'Full-course test',
+        passingScore: COURSE_PASSING_SCORE,
+        questions: assessment.questions.map(questionForLearner),
+      },
+    });
+  } catch (error) {
+    console.error('Load full-course questions error:', error.message);
+    return res.status(500).json({ message: 'Could not load full-course questions' });
+  }
+});
+
+router.post('/full-course/attempts', async (req, res) => {
+  try {
+    const assessment = await getCourseAssessment();
+    if (!isCourseAvailable(assessment)) {
+      return res.status(409).json({
+        success: false,
+        message: courseUnavailableReason(assessment),
+      });
+    }
+
+    const validationError = validateSubmittedAnswers(assessment.questions, req.body.answers);
+    if (validationError) {
+      return res.status(400).json({ success: false, message: validationError });
+    }
+
+    const answers = gradeAnswers(assessment.questions, req.body.answers);
+    const total = answers.length;
+    const correct = answers.filter(answer => answer.isCorrect).length;
+    const score = Math.round((correct / total) * 100);
+    const lessonBreakdown = assessment.lessons.map(lesson => {
+      const lessonAnswers = answers.filter(answer => {
+        const question = assessment.questions.find(
+          item => String(item._id) === String(answer.questionId),
+        );
+        return String(question.lessonId) === String(lesson._id);
+      });
+      const lessonCorrect = lessonAnswers.filter(answer => answer.isCorrect).length;
+      return {
+        lesson: lesson._id,
+        lessonTitle: lesson.title,
+        correct: lessonCorrect,
+        total: lessonAnswers.length,
+        score: Math.round((lessonCorrect / lessonAnswers.length) * 100),
+      };
+    });
+    const passed = score >= COURSE_PASSING_SCORE;
+    const attempt = await QuizAttempt.create({
+      user: req.user._id,
+      quiz: null,
+      mode: 'full-course',
+      quizzes: [...new Set(assessment.questions.map(question => String(question.quizId)))],
+      lessonBreakdown,
+      score,
+      total,
+      answers,
+      passed,
+    });
+
+    return res.status(201).json({
+      success: true,
+      data: {
+        attemptId: attempt._id,
+        mode: 'full-course',
+        score,
+        total,
+        passed,
+        passingScore: COURSE_PASSING_SCORE,
+        lessonBreakdown,
+        answers,
+      },
+    });
+  } catch (error) {
+    console.error('Submit full-course test error:', error.message);
+    return res.status(500).json({ message: 'Could not submit the full-course test' });
+  }
+});
+
+// Fetch one published quiz without exposing answer keys.
 router.get('/:id', async (req, res) => {
   if (!mongoose.isValidObjectId(req.params.id)) {
     return res.status(400).json({ message: 'Invalid quiz ID' });
@@ -49,27 +323,36 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ message: 'Quiz not found' });
     }
 
-    res.json({
+    const lesson = await Lesson.findOne({
+      _id: quiz.lesson,
+      published: true,
+    }).select('_id title');
+    if (!lesson) {
+      return res.status(404).json({ message: 'Quiz not found' });
+    }
+
+    return res.json({
       success: true,
       data: {
         _id: quiz._id,
         title: quiz.title,
         lesson: quiz.lesson,
-        questions: quiz.questions.map(q => ({
-          _id: q._id,
-          prompt: q.prompt,
-          mediaUrl: q.mediaUrl,
-          options: q.options,
+        lessonTitle: lesson.title,
+        passingScore: quiz.passingScore,
+        questions: quiz.questions.map(question => ({
+          _id: question._id,
+          prompt: question.prompt,
+          mediaUrl: question.mediaUrl,
+          options: question.options,
         })),
       },
     });
   } catch (error) {
     console.error('Load quiz error:', error.message);
-    res.status(500).json({ message: 'Could not load quiz' });
+    return res.status(500).json({ message: 'Could not load quiz' });
   }
 });
 
-// Submit answers
 router.post('/:id/attempts', async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) {
@@ -84,83 +367,49 @@ router.post('/:id/attempts', async (req, res) => {
     if (!quiz || quiz.questions.length === 0) {
       return res.status(404).json({ message: 'Quiz not found' });
     }
-
-    const submitted = req.body.answers;
-
-    if (!Array.isArray(submitted)) {
-      return res.status(400).json({ message: 'Answers must be an array' });
+    const lesson = await Lesson.findOne({
+      _id: quiz.lesson,
+      published: true,
+    }).select('_id');
+    if (!lesson) {
+      return res.status(404).json({ message: 'Quiz not found' });
     }
 
-    const questionIds = quiz.questions.map(q => String(q._id));
-
-    if (
-      submitted.length !== questionIds.length ||
-      submitted.some(a => !a || !questionIds.includes(String(a.questionId))) ||
-      new Set(submitted.map(a => String(a.questionId))).size !== questionIds.length
-    ) {
-      return res.status(400).json({
-        message: 'Submit exactly one answer for every question',
-      });
+    const validationError = validateSubmittedAnswers(quiz.questions, req.body.answers);
+    if (validationError) {
+      return res.status(400).json({ message: validationError });
     }
 
-    if (submitted.some(answer => {
-      const question = quiz.questions.find(
-        item => String(item._id) === String(answer.questionId)
-      );
-      return typeof answer.selectedAnswer !== 'string' ||
-        !question.options.includes(answer.selectedAnswer);
-    })) {
-      return res.status(400).json({
-        message: 'Each answer must select one of the question options',
-      });
-    }
-
-    const answers = quiz.questions.map(question => {
-      const response = submitted.find(
-        a => String(a.questionId) === String(question._id)
-      );
-
-      const isCorrect = response.selectedAnswer === question.correctAnswer;
-
-      return {
-        questionId: question._id,
-        selectedAnswer: response.selectedAnswer,
-        isCorrect,
-      };
-    });
-
+    const answers = gradeAnswers(quiz.questions, req.body.answers);
     const total = quiz.questions.length;
-    const correct = answers.filter(a => a.isCorrect).length;
+    const correct = answers.filter(answer => answer.isCorrect).length;
     const score = Math.round((correct / total) * 100);
     const passed = score >= quiz.passingScore;
 
     const attempt = await QuizAttempt.create({
       user: req.user._id,
       quiz: quiz._id,
+      mode: 'lesson',
       score,
       total,
       answers,
       passed,
     });
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       data: {
         attemptId: attempt._id,
         score,
         total,
         passed,
-        answers: answers.map(a => ({
-          questionId: a.questionId,
-          selectedAnswer: a.selectedAnswer,
-          isCorrect: a.isCorrect,
-        })),
-        // Add explanations from the quiz questions here if desired.
+        passingScore: quiz.passingScore,
+        answers,
       },
     });
   } catch (error) {
     console.error('Submit quiz error:', error.message);
-    res.status(500).json({ message: 'Could not submit quiz' });
+    return res.status(500).json({ message: 'Could not submit quiz' });
   }
 });
 

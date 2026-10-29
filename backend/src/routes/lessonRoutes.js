@@ -8,7 +8,7 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const lessons = await Lesson.find({ published: true })
-      .select('title description level category order')
+      .select('slug title description level category order')
       .sort({ order: 1 });
 
     res.json({ success: true, data: lessons });

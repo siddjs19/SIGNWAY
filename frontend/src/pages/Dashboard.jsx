@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   AlertCircle,
   ArrowRight,
   Award,
   BookOpen,
   CheckCircle2,
-  Compass,
+  ClipboardCheck,
   Database,
   Eye,
   FileCheck,
@@ -32,6 +33,7 @@ import './Dashboard.css';
 const navigation = [
   { id: 'dashboard', label: 'Overview', icon: TrendingUp },
   { id: 'lessons', label: 'Lessons & Curricula', icon: BookOpen, badge: 'LEARN' },
+  { id: 'quizzes', label: 'Quizzes & Tests', icon: ClipboardCheck, badge: 'ASSESS' },
   { id: 'studio', label: 'Live Studio & AI Chat', icon: Video, badge: 'COMING SOON' },
   { id: 'community', label: 'Practice Partners & ISL', icon: Users, badge: 'UNAVAILABLE' },
   { id: 'achievements', label: 'Credentials & Blockchain', icon: Trophy, badge: 'PLANNED' },
@@ -47,6 +49,23 @@ function errorMessage(error, fallback) {
   return error.response?.data?.message || fallback;
 }
 
+function youtubeEmbedUrl(embedUrl) {
+  try {
+    const url = new URL(embedUrl);
+    if (
+      url.protocol === 'https:'
+      && url.hostname === 'www.youtube.com'
+      && /^\/embed\/[A-Za-z0-9_-]{11}$/.test(url.pathname)
+      && url.searchParams.get('feature') === 'oembed'
+    ) {
+      return url.href;
+    }
+  } catch {
+    return '';
+  }
+  return '';
+}
+
 function ApiError({ children }) {
   if (!children) return null;
   return (
@@ -58,6 +77,7 @@ function ApiError({ children }) {
 }
 
 export default function DashboardConnected({ user, onLogout }) {
+  const navigate = useNavigate();
   const [activeNav, setActiveNav] = useState('dashboard');
   const [settingsSubTab, setSettingsSubTab] = useState('profile');
   const [profile, setProfile] = useState(user || null);
@@ -81,13 +101,12 @@ export default function DashboardConnected({ user, onLogout }) {
   const [selectedLesson, setSelectedLesson] = useState(null);
   const [selectedSignIndex, setSelectedSignIndex] = useState(0);
   const [quizzes, setQuizzes] = useState([]);
-  const [activeQuiz, setActiveQuiz] = useState(null);
-  const [quizAnswers, setQuizAnswers] = useState({});
-  const [quizResult, setQuizResult] = useState(null);
+  const [activeResourceId, setActiveResourceId] = useState('');
+  const [failedVideoIds, setFailedVideoIds] = useState(() => new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [pageLoading, setPageLoading] = useState(true);
+  const [refreshingLessons, setRefreshingLessons] = useState(false);
   const [lessonLoading, setLessonLoading] = useState(false);
-  const [quizLoading, setQuizLoading] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [pageError, setPageError] = useState('');
   const [lessonError, setLessonError] = useState('');
@@ -188,6 +207,23 @@ export default function DashboardConnected({ user, onLogout }) {
     }
   };
 
+  const refreshLessons = async () => {
+    setRefreshingLessons(true);
+    setPageError('');
+    try {
+      const response = await api.get('/lessons');
+      setLessons(response.data.data || []);
+    } catch (error) {
+      if (error.response?.status === 401) {
+        onLogout();
+        return;
+      }
+      setPageError(errorMessage(error, 'Unable to refresh published lessons.'));
+    } finally {
+      setRefreshingLessons(false);
+    }
+  };
+
   const openLesson = async (lesson) => {
     setActiveNav('lessons');
     setLessonLoading(true);
@@ -196,9 +232,8 @@ export default function DashboardConnected({ user, onLogout }) {
     setSelectedLesson(null);
     setSelectedSignIndex(0);
     setQuizzes([]);
-    setActiveQuiz(null);
-    setQuizAnswers({});
-    setQuizResult(null);
+    setActiveResourceId('');
+    setFailedVideoIds(new Set());
 
     try {
       const [lessonResult, quizResult] = await Promise.allSettled([
@@ -213,7 +248,9 @@ export default function DashboardConnected({ user, onLogout }) {
         return;
       }
       if (lessonResult.status === 'rejected') throw lessonResult.reason;
-      setSelectedLesson(lessonResult.value.data.data);
+      const lessonData = lessonResult.value.data.data;
+      setSelectedLesson(lessonData);
+      setActiveResourceId(lessonData.resources?.[0]?.videoId || '');
 
       if (quizResult.status === 'fulfilled') {
         setQuizzes(quizResult.value.data.data || []);
@@ -228,48 +265,6 @@ export default function DashboardConnected({ user, onLogout }) {
       setLessonError(errorMessage(error, 'Unable to open this lesson.'));
     } finally {
       setLessonLoading(false);
-    }
-  };
-
-  const openQuiz = async (quizId) => {
-    setQuizLoading(true);
-    setQuizError('');
-    setQuizResult(null);
-    setQuizAnswers({});
-    try {
-      const response = await api.get(`/quizzes/${quizId}`);
-      setActiveQuiz(response.data.data);
-    } catch (error) {
-      if (error.response?.status === 401) {
-        onLogout();
-        return;
-      }
-      setQuizError(errorMessage(error, 'Unable to load this quiz.'));
-    } finally {
-      setQuizLoading(false);
-    }
-  };
-
-  const submitQuiz = async () => {
-    if (!activeQuiz) return;
-    setQuizLoading(true);
-    setQuizError('');
-    try {
-      const answers = activeQuiz.questions.map((question) => ({
-        questionId: question._id,
-        selectedAnswer: quizAnswers[question._id] || '',
-      }));
-      const response = await api.post(`/quizzes/${activeQuiz._id}/attempts`, { answers });
-      setQuizResult(response.data.data);
-      setToastMessage(`Quiz submitted: ${response.data.data.score}%`);
-    } catch (error) {
-      if (error.response?.status === 401) {
-        onLogout();
-        return;
-      }
-      setQuizError(errorMessage(error, 'Unable to submit your quiz.'));
-    } finally {
-      setQuizLoading(false);
     }
   };
 
@@ -332,14 +327,132 @@ export default function DashboardConnected({ user, onLogout }) {
       );
     }
 
+    const resources = selectedLesson.resources || [];
+    const activeResource = resources.find(resource => resource.videoId === activeResourceId) || resources[0];
+    const activeEmbedUrl = activeResource
+      && activeResource.metadataStatus === 'verified'
+      && activeResource.availabilityStatus === 'available'
+      && activeResource.embeddable
+      ? youtubeEmbedUrl(activeResource.embedUrl)
+      : '';
+    const videoFailed = activeResource && failedVideoIds.has(activeResource.videoId);
+
     return (
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr_1fr]">
-        <section className={columnCard}>
-          <div className="sb-integration-detail-heading">
+      <article className="mx-auto flex w-full max-w-[1120px] flex-col gap-7">
+        <nav className="flex flex-wrap items-center justify-between gap-3" aria-label="Lesson navigation">
+          <button
+            type="button"
+            className={outlineButton}
+            onClick={() => {
+              setSelectedLesson(null);
+              setActiveNav('lessons');
+            }}
+          >
+            <ArrowRight className="rotate-180" size={16} />
+            Back to lessons
+          </button>
+          <span className="text-sm font-semibold text-sb-muted">
+            {selectedLesson.category} · {selectedLesson.level}
+          </span>
+        </nav>
+
+        <header className="space-y-2">
+          <h2 className="m-0 text-2xl font-extrabold tracking-tight text-sb-soft sm:text-3xl">
+            {selectedLesson.title}
+          </h2>
+          <p className="m-0 max-w-3xl text-sm leading-relaxed text-sb-body sm:text-base">
+            {selectedLesson.description}
+          </p>
+        </header>
+
+        <section className={`${cardSurface} overflow-hidden p-3 sm:p-5`} aria-label="Lesson video player">
+          {activeEmbedUrl && !videoFailed ? (
+            <div className="aspect-video w-full overflow-hidden rounded-2xl bg-[#040d16]">
+              <iframe
+                className="h-full w-full"
+                src={activeEmbedUrl}
+                title={`${activeResource.title} — ${activeResource.author}`}
+                referrerPolicy="strict-origin-when-cross-origin"
+                allow="encrypted-media; picture-in-picture; web-share"
+                allowFullScreen
+                onError={() => setFailedVideoIds(previous => new Set(previous).add(activeResource.videoId))}
+              />
+            </div>
+          ) : (
+            <div className="grid aspect-video w-full place-items-center rounded-2xl border border-dashed border-[rgba(92,225,214,0.2)] bg-[#040d16] p-6 text-center">
+              <div className="max-w-lg">
+                <Video size={32} className="mx-auto mb-3 text-sb-muted" />
+                <h3 className="m-0 text-lg font-bold text-sb-soft">
+                  {activeResource ? 'Embedded playback is unavailable' : 'No video is available for this lesson'}
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-sb-muted">
+                  {activeResource
+                    ? 'You can still open the original learning resource directly.'
+                    : 'Check the lesson resources or return to the published lesson list.'}
+                </p>
+                {activeResource?.sourceUrl && (
+                  <a
+                    className="mt-4 inline-flex items-center gap-2 font-bold text-sb-signal underline underline-offset-4"
+                    href={activeResource.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Open original video on YouTube <ArrowRight size={15} />
+                  </a>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeResource && (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="m-0 text-xs font-bold uppercase tracking-wider text-sb-signal">Official resource · ISLRTC</p>
+                <h3 className="mt-1 truncate text-base font-extrabold text-sb-soft">{activeResource.title}</h3>
+                <p className="mt-1 text-xs text-sb-muted">
+                  {activeResource.author} · YouTube · {activeResource.metadataStatus === 'verified' ? 'Metadata checked' : 'Metadata not verified'}
+                </p>
+              </div>
+              <a
+                className="shrink-0 font-bold text-sb-signal underline underline-offset-4"
+                href={activeResource.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open on YouTube
+              </a>
+            </div>
+          )}
+        </section>
+
+        {resources.length > 1 && (
+          <section aria-label="Select lesson video" className="space-y-3">
+            <h3 className="m-0 text-sm font-extrabold text-sb-soft">More videos in this lesson</h3>
+            <div className="flex flex-wrap gap-2">
+              {resources.map((resource, index) => (
+                <button
+                  type="button"
+                  key={resource.videoId}
+                  aria-pressed={activeResource?.videoId === resource.videoId}
+                  className={`${outlineButton} ${activeResource?.videoId === resource.videoId ? 'border-sb-signal bg-[rgba(92,225,214,0.12)]' : ''}`}
+                  onClick={() => setActiveResourceId(resource.videoId)}
+                >
+                  <PlayCircle size={15} />
+                  {index === 0 ? 'Primary: ' : ''}{resource.title}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section className={`${cardSurface} space-y-6 p-5 sm:p-7`} aria-labelledby="lesson-overview-heading">
+          <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <span className="sb-integration-eyebrow">{selectedLesson.category} · {selectedLesson.level}</span>
-              <h2>{selectedLesson.title}</h2>
-              <p>{selectedLesson.description}</p>
+              <p className="sb-integration-eyebrow">Lesson overview</p>
+              <h3 id="lesson-overview-heading" className="m-0 text-xl font-extrabold text-sb-soft sm:text-2xl">
+                {selectedLesson.title}
+              </h3>
+              <p className="mt-2 max-w-3xl leading-relaxed text-sb-body">{selectedLesson.description}</p>
             </div>
             <button
               type="button"
@@ -352,15 +465,48 @@ export default function DashboardConnected({ user, onLogout }) {
             </button>
           </div>
 
+          <div className="flex flex-wrap gap-2">
+            <span className="rounded-full border border-[rgba(92,225,214,0.2)] px-3 py-1 text-xs font-bold text-sb-signal">
+              {selectedLesson.category} · {selectedLesson.level}
+            </span>
+            {selectedLesson.duration && (
+              <span className="rounded-full border border-[rgba(92,225,214,0.14)] px-3 py-1 text-xs font-semibold text-sb-muted">
+                {selectedLesson.duration} min
+              </span>
+            )}
+          </div>
+
+          {selectedLesson.introduction && (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h4 className="m-0 text-base font-extrabold text-sb-soft">About this lesson</h4>
+                <span className="rounded-lg border border-amber-300/30 bg-amber-300/10 px-2.5 py-1 text-xs font-bold text-amber-200">
+                  SignBridge text: {selectedLesson.contentReviewStatus === 'reviewed' ? 'reviewed' : 'awaiting qualified review'}
+                </span>
+              </div>
+              <p className="m-0 leading-relaxed text-sb-body">{selectedLesson.introduction}</p>
+            </div>
+          )}
+
+          {selectedLesson.learningObjectives?.length > 0 && (
+            <div>
+              <h4 className="mb-2 text-sm font-bold text-sb-soft">Learning objectives</h4>
+              <ul className="m-0 list-disc space-y-1 pl-5 text-sm leading-relaxed text-sb-body">
+                {selectedLesson.learningObjectives.map((objective) => <li key={objective}>{objective}</li>)}
+              </ul>
+            </div>
+          )}
+
           {selectedLesson.signs?.length > 0 ? (
-            <>
-              <div className="sb-signs-selector-bar" role="tablist" aria-label="Lesson signs">
+            <div className="space-y-4">
+              <h4 className="m-0 text-sm font-bold text-sb-soft">Vocabulary and practice</h4>
+              <div className="flex flex-wrap gap-2" role="tablist" aria-label="Lesson vocabulary">
                 {selectedLesson.signs.map((sign, index) => (
                   <button
                     type="button"
                     role="tab"
                     aria-selected={selectedSignIndex === index}
-                    className={`sb-sign-select-btn ${selectedSignIndex === index ? 'active' : ''}`}
+                    className={`${outlineButton} ${selectedSignIndex === index ? 'border-sb-signal bg-[rgba(92,225,214,0.12)]' : ''}`}
                     key={sign._id || `${sign.term}-${index}`}
                     onClick={() => setSelectedSignIndex(index)}
                   >
@@ -368,135 +514,76 @@ export default function DashboardConnected({ user, onLogout }) {
                   </button>
                 ))}
               </div>
-
               {currentSign && (
                 <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                  <div className="sb-demo-viewport">
+                  <div className={`${cardSurface} overflow-hidden p-4`}>
                     {currentSign.mediaType === 'video' && currentSign.mediaUrl ? (
-                      <video controls src={currentSign.mediaUrl}>Video playback is not supported.</video>
+                      <video className="max-h-80 w-full rounded-xl" controls src={currentSign.mediaUrl}>
+                        Video playback is not supported.
+                      </video>
                     ) : currentSign.mediaUrl ? (
-                      <img src={currentSign.mediaUrl} alt={`Lesson media for ${currentSign.term}`} />
+                      <img className="max-h-80 w-full rounded-xl object-contain" src={currentSign.mediaUrl} alt={`Lesson media for ${currentSign.term}`} />
                     ) : (
-                      <div className="sb-integration-empty">
-                        <Compass size={28} />
-                        <p>No demonstration media was provided for this sign.</p>
-                      </div>
+                      <p className="text-sm text-sb-muted">No demonstration media was provided for this vocabulary item.</p>
                     )}
-                    <span className="sb-integration-review">
-                      {currentSign.verified
-                        ? 'Marked reviewed in lesson records'
-                        : 'Awaiting qualified ISL review'}
-                      {' · '}Accuracy and media sources are not independently verified here.
-                    </span>
                   </div>
-                  <div className={`${cardSurface} p-6 sb-integration-sign-copy`}>
-                    <h3>{currentSign.term}</h3>
-                    <p><strong>Meaning:</strong> {currentSign.meaning}</p>
-                    {currentSign.explanation && <p><strong>Explanation:</strong> {currentSign.explanation}</p>}
-                    {currentSign.example && <p><strong>Example:</strong> {currentSign.example}</p>}
+                  <div className={`${cardSurface} space-y-3 p-5`}>
+                    <h4 className="m-0 font-bold text-sb-soft">{currentSign.term}</h4>
+                    <p className="m-0 text-sm leading-relaxed text-sb-body"><strong>Meaning:</strong> {currentSign.meaning}</p>
+                    {currentSign.explanation && <p className="m-0 text-sm leading-relaxed text-sb-body"><strong>Explanation:</strong> {currentSign.explanation}</p>}
+                    {currentSign.example && <p className="m-0 text-sm leading-relaxed text-sb-body"><strong>Example:</strong> {currentSign.example}</p>}
+                    <p className="m-0 text-xs text-amber-200">
+                      {currentSign.verified ? 'Marked reviewed in lesson records' : 'Awaiting qualified ISL review'} · Individual sign accuracy is not independently validated here.
+                    </p>
                     {currentSign.sourceUrl && (
-                      <p>
-                        <a href={currentSign.sourceUrl} target="_blank" rel="noreferrer">
-                          View source listed with this lesson
-                        </a>
-                      </p>
+                      <a className="text-sm font-bold text-sb-signal underline underline-offset-4" href={currentSign.sourceUrl} target="_blank" rel="noreferrer">
+                        View listed source
+                      </a>
                     )}
                   </div>
                 </div>
               )}
-            </>
+            </div>
           ) : (
-            <div className="sb-integration-empty">
-              <AlertCircle size={28} />
-              <h3>No lesson vocabulary is available</h3>
-              <p>This published lesson does not currently contain sign records.</p>
+            <div className="rounded-2xl border border-dashed border-[rgba(92,225,214,0.18)] p-5">
+              <h4 className="m-0 font-bold text-sb-soft">No SignBridge vocabulary entries</h4>
+              <p className="mb-0 mt-2 text-sm leading-relaxed text-sb-muted">
+                Use the attributed ISLRTC resource for its demonstrations. SignBridge has not added or independently verified individual sign records for this lesson.
+              </p>
             </div>
           )}
-        </section>
 
-        <section className={columnCard}>
-          <div className="sb-integration-section-heading">
-            <div>
-              <span className="sb-integration-eyebrow">Knowledge check</span>
-              <h3>Lesson quizzes</h3>
-            </div>
-          </div>
-          <ApiError>{quizError}</ApiError>
-          {quizLoading && <p className="sb-integration-state" role="status">Loading quiz…</p>}
-          {!quizLoading && !quizError && !activeQuiz && quizzes.length === 0 && (
-            <p className="sb-integration-empty-copy">No published quizzes are available for this lesson.</p>
+          {selectedLesson.contentReviewNote && (
+            <p className="m-0 rounded-xl bg-[rgba(7,20,33,0.6)] p-4 text-xs leading-relaxed text-sb-muted">
+              {selectedLesson.contentReviewNote}
+            </p>
           )}
-          {!activeQuiz && quizzes.map((quiz) => (
-            <button
-              className="sb-integration-quiz-link"
-              type="button"
-              key={quiz._id}
-              onClick={() => openQuiz(quiz._id)}
-            >
-              <span>{quiz.title}</span><ArrowRight size={17} />
-            </button>
-          ))}
-          {activeQuiz && (
-            <div className="sb-integration-quiz">
-              <div className="sb-integration-quiz-title">
-                <h4>{activeQuiz.title}</h4>
-                <button className="sb-integration-text-button" type="button" onClick={() => setActiveQuiz(null)}>
-                  Back to quizzes
-                </button>
-              </div>
-              {activeQuiz.questions.map((question, index) => {
-                const submittedAnswer = quizResult?.answers.find(
-                  (answer) => String(answer.questionId) === String(question._id),
-                );
-                return (
-                  <fieldset className="sb-integration-question" key={question._id}>
-                    <legend>{index + 1}. {question.prompt}</legend>
-                    {question.mediaUrl && <img src={question.mediaUrl} alt="Quiz question media" />}
-                    {question.options.map((option) => (
-                      <label className="sb-integration-option" key={option}>
-                        <input
-                          type="radio"
-                          name={question._id}
-                          value={option}
-                          checked={quizAnswers[question._id] === option}
-                          disabled={Boolean(quizResult)}
-                          onChange={() => setQuizAnswers((answers) => ({
-                            ...answers,
-                            [question._id]: option,
-                          }))}
-                        />
-                        <span>{option}</span>
-                        {submittedAnswer?.selectedAnswer === option && submittedAnswer.isCorrect && (
-                          <CheckCircle2 size={16} aria-label="Correct answer" />
-                        )}
-                      </label>
-                    ))}
-                  </fieldset>
-                );
-              })}
-              {quizResult ? (
-                <div className="sb-quiz-score-card" role="status">
-                  <p className="sb-integration-eyebrow">Assessment result</p>
-                  <div className="sb-score-big">{quizResult.score}%</div>
-                  <p>{quizResult.total} questions · {quizResult.passed ? 'Passed' : 'Keep practicing'}</p>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  className={primaryButton}
-                  disabled={
-                    quizLoading
-                    || Object.keys(quizAnswers).length !== activeQuiz.questions.length
-                  }
-                  onClick={submitQuiz}
-                >
-                  {quizLoading ? 'Submitting…' : 'Submit answers'}
-                </button>
+
+          <div className="flex flex-wrap items-center justify-between gap-4 border-t border-[rgba(92,225,214,0.14)] pt-5">
+            <div>
+              <h4 className="m-0 font-extrabold text-sb-soft">Ready to check your understanding?</h4>
+              {quizzes.length === 0 && (
+                <p className="mb-0 mt-1 text-sm text-sb-muted">
+                  {quizError || 'No published quiz is currently available for this lesson.'}
+                </p>
               )}
             </div>
-          )}
+            {quizzes.length > 0 ? (
+              <button
+                type="button"
+                className={primaryButton}
+                onClick={() => navigate(`/quiz/lesson/${selectedLesson._id}`)}
+              >
+                <ClipboardCheck size={17} /> Take lesson quiz
+              </button>
+            ) : (
+              <button type="button" className={primaryButton} disabled>
+                <ClipboardCheck size={17} /> Quiz unavailable
+              </button>
+            )}
+          </div>
         </section>
-      </div>
+      </article>
     );
   };
 
@@ -520,12 +607,18 @@ export default function DashboardConnected({ user, onLogout }) {
         <div className="mb-4 flex items-center justify-between">
           <h2 className="flex items-center gap-2.5 text-lg font-extrabold tracking-tight text-sb-soft"><Zap size={20} className="text-sb-signal" />Feature Shortcuts</h2>
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
           <button type="button" className="group relative flex flex-col rounded-2xl border border-[rgba(92,225,214,0.14)] bg-[rgba(24,48,65,0.7)] p-6 text-left text-sb-body shadow-sm backdrop-blur-xl transition duration-200 hover:-translate-y-1 hover:border-sb-signal hover:bg-[rgba(24,48,65,0.95)] hover:shadow-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sb-signal" onClick={() => setActiveNav('lessons')}>
             <span className="mb-4 grid size-13 place-items-center rounded-2xl border border-[rgba(92,225,214,0.3)] bg-[rgba(92,225,214,0.12)] text-sb-signal transition group-hover:scale-105"><BookOpen size={24} /></span>
             <span className="mb-1 text-base font-extrabold text-sb-soft">Lessons & Curricula</span>
             <span className="mb-4 flex-1 text-sm leading-relaxed text-sb-muted">Browse published lesson content, review supplied material, and complete quizzes.</span>
             <span className="mt-auto flex items-center gap-1.5 text-sm font-bold text-sb-signal">Explore lessons <ArrowRight size={14} /></span>
+          </button>
+          <button type="button" className="group relative flex flex-col rounded-2xl border border-[rgba(92,225,214,0.14)] bg-[rgba(24,48,65,0.7)] p-6 text-left text-sb-body shadow-sm backdrop-blur-xl transition duration-200 hover:-translate-y-1 hover:border-sb-signal hover:bg-[rgba(24,48,65,0.95)] hover:shadow-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sb-signal" onClick={() => navigate('/quiz')}>
+            <span className="mb-4 grid size-13 place-items-center rounded-2xl border border-[rgba(92,225,214,0.3)] bg-[rgba(92,225,214,0.12)] text-sb-signal transition group-hover:scale-105"><ClipboardCheck size={24} /></span>
+            <span className="mb-1 text-base font-extrabold text-sb-soft">Quizzes & Tests</span>
+            <span className="mb-4 flex-1 text-sm leading-relaxed text-sb-muted">Choose an available lesson quiz or check full-course test readiness.</span>
+            <span className="mt-auto flex items-center gap-1.5 text-sm font-bold text-sb-signal">Explore quizzes <ArrowRight size={14} /></span>
           </button>
           <button type="button" className="group relative flex flex-col rounded-2xl border border-[rgba(92,225,214,0.14)] bg-[rgba(24,48,65,0.7)] p-6 text-left text-sb-body shadow-sm backdrop-blur-xl transition duration-200 hover:-translate-y-1 hover:border-sb-signal hover:bg-[rgba(24,48,65,0.95)] hover:shadow-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sb-signal" onClick={() => setActiveNav('studio')}>
             <span className="mb-4 grid size-13 place-items-center rounded-2xl border border-[rgba(146,117,255,0.3)] bg-[rgba(146,117,255,0.15)] text-sb-violet transition group-hover:scale-105"><Video size={24} /></span>
@@ -558,6 +651,11 @@ export default function DashboardConnected({ user, onLogout }) {
           </div>
           {pageLoading ? (
             <p className="sb-integration-state" role="status">Loading learning progress…</p>
+          ) : selectedLesson ? (
+            <>
+              {lessonLoading && <p className="sb-integration-state" role="status">Loading lesson…</p>}
+              {renderLessonDetail()}
+            </>
           ) : (
             <>
               <p className="sb-integration-muted">Calculated from unique completions of published lessons.</p>
@@ -625,7 +723,13 @@ export default function DashboardConnected({ user, onLogout }) {
       <ApiError>{pageError || lessonError}</ApiError>
       <header>
         <p className="sb-integration-eyebrow">Indian Sign Language</p>
-        <h1 className="sb-integration-page-title">Lessons & Curricula</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="sb-integration-page-title">Lessons & Curricula</h1>
+          <button type="button" className={outlineButton} onClick={refreshLessons} disabled={refreshingLessons}>
+            <RefreshCw size={15} className={refreshingLessons ? 'animate-spin' : ''} />
+            {refreshingLessons ? 'Refreshing…' : 'Refresh published lessons'}
+          </button>
+        </div>
         <p className="sb-integration-muted">
           Lesson content is shown as supplied. A review marker does not independently establish
           the accuracy of ISL instruction or linked media; content awaiting qualified review is labeled.
@@ -637,7 +741,11 @@ export default function DashboardConnected({ user, onLogout }) {
         <div className="sb-integration-empty">
           <BookOpen size={28} />
           <h3>No published lessons yet</h3>
-          <p>Reviewed learning material will appear here when it is published.</p>
+          <p>Only published lessons are available here. Draft lessons awaiting qualified ISL review are not shown to learners.</p>
+          <button type="button" className={outlineButton} onClick={refreshLessons} disabled={refreshingLessons}>
+            <RefreshCw size={15} className={refreshingLessons ? 'animate-spin' : ''} />
+            {refreshingLessons ? 'Refreshing…' : 'Refresh published lessons'}
+          </button>
         </div>
       ) : (
         <>
@@ -668,7 +776,6 @@ export default function DashboardConnected({ user, onLogout }) {
               />
             </label>
           </div>
-          {lessonLoading && <p className="sb-integration-state" role="status">Loading lesson…</p>}
           {renderLessonDetail()}
         </>
       )}
@@ -986,7 +1093,7 @@ export default function DashboardConnected({ user, onLogout }) {
 
   return (
     <div className="flex min-h-screen overflow-x-hidden bg-[#071421] bg-[radial-gradient(at_0%_0%,rgba(146,117,255,0.12)_0px,transparent_45%),radial-gradient(at_100%_100%,rgba(92,225,214,0.1)_0px,transparent_45%)] text-[#c9d9e8]">
-      <aside className="z-30 flex w-[275px] shrink-0 flex-col border-r border-[rgba(92,225,214,0.14)] bg-[rgba(7,20,33,0.95)] p-5 shadow-sm backdrop-blur-xl max-lg:w-[76px] max-lg:px-2">
+      <aside className="z-30 flex w-[275px] shrink-0 flex-col border-r border-[rgba(92,225,214,0.14)] bg-[rgba(7,20,33,0.95)] p-5 shadow-sm backdrop-blur-xl max-lg:w-[76px] max-lg:px-2 max-sm:w-14 max-sm:px-1">
         <div className="mb-8 flex items-center gap-3 px-1">
           <div className="grid size-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-sb-violet to-sb-signal text-2xl text-sb-midnight shadow-lg" aria-hidden="true">🤟</div>
           <div className="max-lg:hidden">
@@ -1008,7 +1115,7 @@ export default function DashboardConnected({ user, onLogout }) {
                 }`}
                 aria-current={activeNav === id ? 'page' : undefined}
                 aria-label={label}
-                onClick={() => setActiveNav(id)}
+                onClick={() => (id === 'quizzes' ? navigate('/quiz') : setActiveNav(id))}
                 >
                   <Icon size={18} />
                   <span className="max-lg:hidden">{label}</span>

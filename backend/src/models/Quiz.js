@@ -14,6 +14,7 @@ const questionSchema = new mongoose.Schema({
 
 const quizSchema = new mongoose.Schema(
   {
+    slug: { type: String, unique: true, sparse: true },
     lesson: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Lesson',
@@ -22,6 +23,11 @@ const quizSchema = new mongoose.Schema(
     title: { type: String, required: true },
     questions: [questionSchema],
     passingScore: { type: Number, default: 70 },
+    contentReviewStatus: {
+      type: String,
+      enum: ['pending', 'reviewed'],
+      default: 'pending',
+    },
     published: { type: Boolean, default: false },
   },
   { timestamps: true }

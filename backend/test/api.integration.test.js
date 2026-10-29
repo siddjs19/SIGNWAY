@@ -20,12 +20,55 @@ const ids = {
   lesson: '64b000000000000000000020',
   firstQuestion: '64b000000000000000000031',
   secondQuestion: '64b000000000000000000032',
+  thirdQuestion: '64b000000000000000000033',
+  fourthQuestion: '64b000000000000000000034',
+  fifthQuestion: '64b000000000000000000035',
+  secondQuiz: '64b000000000000000000011',
+  secondLesson: '64b000000000000000000022',
+};
+
+const secondPublishedLesson = {
+  _id: ids.secondLesson,
+  slug: 'published-greetings',
+  title: 'Published greetings',
+  description: 'A second published lesson.',
+  level: 'beginner',
+  category: 'Communication',
+  order: 2,
+  published: true,
+};
+
+const courseQuiz = {
+  _id: ids.secondQuiz,
+  title: 'Greetings check',
+  lesson: ids.secondLesson,
+  published: true,
+  questions: [
+    { _id: ids.thirdQuestion, prompt: 'Question three', options: ['Correct', 'Incorrect'], correctAnswer: 'Correct' },
+    { _id: ids.fourthQuestion, prompt: 'Question four', options: ['Correct', 'Incorrect'], correctAnswer: 'Correct' },
+    { _id: ids.fifthQuestion, prompt: 'Question five', options: ['Correct', 'Incorrect'], correctAnswer: 'Correct' },
+  ],
+};
+
+const draftQuiz = {
+  _id: '64b000000000000000000012',
+  title: 'Unpublished draft quiz',
+  lesson: '64b000000000000000000021',
+  published: false,
+  questions: [{
+    _id: '64b000000000000000000036',
+    prompt: 'Draft-only question',
+    options: ['Correct', 'Incorrect'],
+    correctAnswer: 'Correct',
+  }],
 };
 
 const originalMethods = {
   userFindById: User.findById,
+  quizFind: Quiz.find,
   quizFindOne: Quiz.findOne,
   quizAttemptCreate: QuizAttempt.create,
+  lessonFind: Lesson.find,
   lessonFindOne: Lesson.findOne,
   lessonCountDocuments: Lesson.countDocuments,
   lessonCompletionFind: LessonCompletion.find,
@@ -56,12 +99,41 @@ const quiz = {
   ],
 };
 
+const publishedLesson = {
+  _id: ids.lesson,
+  slug: 'published-foundations',
+  title: 'Published foundations',
+  description: 'A reviewed lesson.',
+  level: 'beginner',
+  category: 'Foundations',
+  order: 1,
+  published: true,
+  signs: [],
+  resources: [{
+    title: 'Official resource',
+    videoId: '5PF6JXzYyUI',
+    sourceUrl: 'https://www.youtube.com/watch?v=5PF6JXzYyUI',
+    playlistUrl: 'https://www.youtube.com/playlist?list=PLFjydPMg4DapfRTBMokl09Ht-fhMOAYf6',
+    availabilityStatus: 'available',
+    embeddable: true,
+  }],
+};
+
+const draftLesson = {
+  _id: '64b000000000000000000021',
+  title: 'Unpublished draft',
+  published: false,
+};
+
 function query(value) {
   return {
     lean() {
       return this;
     },
     select() {
+      return this;
+    },
+    sort() {
       return this;
     },
     then(resolve, reject) {
@@ -74,8 +146,38 @@ function tokenFor(userId) {
   return jwt.sign({ userId }, process.env.JWT_SECRET);
 }
 
+test('QuizAttempt schema accepts a full-course result without a single quiz reference', async () => {
+  const attempt = new QuizAttempt({
+    user: ids.user,
+    quiz: null,
+    mode: 'full-course',
+    quizzes: [ids.quiz, ids.secondQuiz],
+    lessonBreakdown: [{
+      lesson: ids.lesson,
+      lessonTitle: 'Published foundations',
+      correct: 2,
+      total: 2,
+      score: 100,
+    }],
+    score: 100,
+    total: 2,
+    passed: true,
+    answers: [{
+      questionId: ids.firstQuestion,
+      selectedAnswer: 'Correct',
+      isCorrect: true,
+      correctAnswer: 'Correct',
+      explanation: 'Server-graded result.',
+    }],
+  });
+
+  await assert.doesNotReject(() => attempt.validate());
+  assert.equal(attempt.mode, 'full-course');
+});
+
 let server;
 let apiUrl;
+let limitedCoursePool = false;
 
 before(async () => {
   const completions = new Map();
@@ -83,12 +185,30 @@ before(async () => {
   const attempts = [];
 
   User.findById = async (userId) => ({ _id: String(userId) });
-  Quiz.findOne = () => query(quiz);
+  Quiz.find = (filter) => query(
+    filter.published === true
+      ? (limitedCoursePool ? [quiz] : [quiz, courseQuiz]).filter(item => filter.lesson?.$in
+        ? filter.lesson.$in.map(String).includes(String(item.lesson))
+        : true)
+      : [quiz, courseQuiz, draftQuiz],
+  );
+  Quiz.findOne = (filter) => query(String(filter._id) === ids.quiz ? quiz : null);
   QuizAttempt.create = async (attempt) => {
     attempts.push(attempt);
     return { _id: '64b000000000000000000099', ...attempt };
   };
-  Lesson.findOne = () => query({ _id: ids.lesson });
+  Lesson.find = ({ published }) => query(
+    published === true
+      ? [publishedLesson, secondPublishedLesson]
+      : [publishedLesson, secondPublishedLesson, draftLesson],
+  );
+  Lesson.findOne = (filter) => query(
+    filter.published === true && String(filter._id) === ids.lesson
+      ? publishedLesson
+      : filter.published === true && String(filter._id) === ids.secondLesson
+        ? secondPublishedLesson
+      : null,
+  );
   Lesson.countDocuments = async () => 1;
   LessonCompletion.find = ({ user }) => {
     const records = completions.get(String(user)) || [];
@@ -142,8 +262,10 @@ after(async () => {
   }
 
   User.findById = originalMethods.userFindById;
+  Quiz.find = originalMethods.quizFind;
   Quiz.findOne = originalMethods.quizFindOne;
   QuizAttempt.create = originalMethods.quizAttemptCreate;
+  Lesson.find = originalMethods.lessonFind;
   Lesson.findOne = originalMethods.lessonFindOne;
   Lesson.countDocuments = originalMethods.lessonCountDocuments;
   LessonCompletion.find = originalMethods.lessonCompletionFind;
@@ -152,13 +274,125 @@ after(async () => {
   Progress.findOneAndUpdate = originalMethods.progressFindOneAndUpdate;
 });
 
+test('lesson catalog returns published records and keeps drafts hidden from learners', async () => {
+  const listResponse = await fetch(`${apiUrl}/lessons`);
+  assert.equal(listResponse.status, 200);
+  const catalog = await listResponse.json();
+  assert.equal(catalog.success, true);
+  assert.equal(catalog.data.length, 2);
+  assert.equal(catalog.data[0].title, publishedLesson.title);
+  assert.equal(catalog.data.some((lesson) => lesson._id === draftLesson._id), false);
+
+  const detailResponse = await fetch(`${apiUrl}/lessons/${ids.lesson}`);
+  assert.equal(detailResponse.status, 200);
+  const detail = await detailResponse.json();
+  assert.equal(detail.data.title, publishedLesson.title);
+  assert.deepEqual(detail.data.signs, []);
+  assert.equal(detail.data.resources[0].videoId, '5PF6JXzYyUI');
+
+  const draftDetailResponse = await fetch(`${apiUrl}/lessons/${draftLesson._id}`);
+  assert.equal(draftDetailResponse.status, 404);
+});
+
+test('full-course assessment mixes published questions and saves a graded attempt', async () => {
+  const headers = {
+    Authorization: `Bearer ${tokenFor(ids.user)}`,
+    'Content-Type': 'application/json',
+  };
+  const overviewResponse = await fetch(`${apiUrl}/quizzes/full-course`, { headers });
+  assert.equal(overviewResponse.status, 200);
+  const overview = await overviewResponse.json();
+  assert.equal(overview.data.available, true);
+  assert.equal(overview.data.questionCount, 5);
+  assert.equal(overview.data.lessonCount, 2);
+  assert.equal(overview.data.passingScore, 70);
+  assert.equal('timeLimit' in overview.data, false);
+  assert.equal('attemptLimit' in overview.data, false);
+
+  const lessonQuizListResponse = await fetch(
+    `${apiUrl}/quizzes?lessonId=${ids.lesson}`,
+    { headers },
+  );
+  assert.equal(lessonQuizListResponse.status, 200);
+  const lessonQuizList = await lessonQuizListResponse.json();
+  assert.equal(lessonQuizList.data.length, 1);
+  assert.equal(lessonQuizList.data[0]._id, ids.quiz);
+
+  const unpublishedLessonQuizListResponse = await fetch(
+    `${apiUrl}/quizzes?lessonId=${draftLesson._id}`,
+    { headers },
+  );
+  assert.equal(unpublishedLessonQuizListResponse.status, 404);
+  const draftQuizResponse = await fetch(
+    `${apiUrl}/quizzes/${draftQuiz._id}`,
+    { headers },
+  );
+  assert.equal(draftQuizResponse.status, 404);
+
+  const questionsResponse = await fetch(`${apiUrl}/quizzes/full-course/questions`, { headers });
+  assert.equal(questionsResponse.status, 200);
+  const test = await questionsResponse.json();
+  assert.equal(test.data.questions.length, 5);
+  assert.equal(new Set(test.data.questions.map(question => String(question.lessonId))).size, 2);
+  assert.equal(test.data.questions.some(question => 'correctAnswer' in question), false);
+  assert.equal(test.data.questions.some(question => question.prompt === 'Draft-only question'), false);
+
+  const invalidAttempt = await fetch(`${apiUrl}/quizzes/full-course/attempts`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ answers: [] }),
+  });
+  assert.equal(invalidAttempt.status, 400);
+  assert.equal(server.testState.attempts.length, 0);
+
+  const attemptResponse = await fetch(`${apiUrl}/quizzes/full-course/attempts`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      answers: test.data.questions.map(question => ({
+        questionId: question._id,
+        selectedAnswer: 'Correct',
+      })),
+    }),
+  });
+  assert.equal(attemptResponse.status, 201);
+  const attemptResult = await attemptResponse.json();
+  assert.equal(attemptResult.data.mode, 'full-course');
+  assert.equal(attemptResult.data.score, 100);
+  assert.equal(attemptResult.data.passed, true);
+  assert.equal(attemptResult.data.lessonBreakdown.length, 2);
+  assert.equal(server.testState.attempts[0].mode, 'full-course');
+  assert.equal(server.testState.attempts[0].quiz, null);
+});
+
+test('full-course overview explains when its published question pool is too small', async () => {
+  limitedCoursePool = true;
+  try {
+    const response = await fetch(`${apiUrl}/quizzes/full-course`, {
+      headers: { Authorization: `Bearer ${tokenFor(ids.user)}` },
+    });
+    assert.equal(response.status, 200);
+    const overview = await response.json();
+    assert.equal(overview.data.available, false);
+    assert.equal(overview.data.questionCount, 2);
+    assert.equal(overview.data.lessonCount, 1);
+    assert.match(overview.data.reason, /at least 5 published questions/);
+    assert.match(overview.data.reason, /at least 2 lessons/);
+  } finally {
+    limitedCoursePool = false;
+  }
+});
+
 test('auth protects quiz submission, withholds answers, and tracks unique user completions', async () => {
+  const initialAttemptCount = server.testState.attempts.length;
   const unauthenticated = await fetch(`${apiUrl}/quizzes/${ids.quiz}/attempts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ answers: [] }),
   });
   assert.equal(unauthenticated.status, 401);
+  const unauthenticatedCourseOverview = await fetch(`${apiUrl}/quizzes/full-course`);
+  assert.equal(unauthenticatedCourseOverview.status, 401);
 
   const authHeaders = {
     Authorization: `Bearer ${tokenFor(ids.user)}`,
@@ -183,7 +417,7 @@ test('auth protects quiz submission, withholds answers, and tracks unique user c
     }),
   });
   assert.equal(invalidAttempt.status, 400);
-  assert.equal(server.testState.attempts.length, 0);
+  assert.equal(server.testState.attempts.length, initialAttemptCount);
 
   const attemptResponse = await fetch(`${apiUrl}/quizzes/${ids.quiz}/attempts`, {
     method: 'POST',
@@ -199,7 +433,8 @@ test('auth protects quiz submission, withholds answers, and tracks unique user c
   const attempt = await attemptResponse.json();
   assert.equal(attempt.data.score, 50);
   assert.equal(attempt.data.total, 2);
-  assert.equal(server.testState.attempts[0].user, ids.user);
+  assert.equal(attempt.data.answers[0].correctAnswer, 'Correct');
+  assert.equal(server.testState.attempts.at(-1).user, ids.user);
 
   const invalidCompletion = await fetch(`${apiUrl}/progress/complete-lesson`, {
     method: 'PATCH',
