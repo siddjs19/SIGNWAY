@@ -6,6 +6,11 @@ const app = require('./app');
 const PORT = process.env.PORT || 5000;
 
 async function startServer() {
+  if (!process.env.JWT_SECRET) {
+    console.error('JWT_SECRET must be configured before starting the API');
+    process.exit(1);
+  }
+
   try {
     await mongoose.connect(
       process.env.MONGODB_URI ||

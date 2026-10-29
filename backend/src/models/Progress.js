@@ -17,8 +17,8 @@ const progressSchema = new mongoose.Schema(
 
     totalLessons: {
       type: Number,
-      default: 20,
-      min: 1
+      default: 0,
+      min: 0
     },
 
     achievements: {
