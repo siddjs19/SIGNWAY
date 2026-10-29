@@ -1,34 +1,82 @@
+import { useCallback, useEffect, useState } from 'react';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import Dashboard from './pages/Dashboard';
+import api, { clearStoredToken, getStoredToken } from './services/api';
+import authService from './services/authService';
 
+export default function App() {
+  const [authView, setAuthView] = useState('login');
+  const [currentUser, setCurrentUser] = useState(null);
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [sessionError, setSessionError] = useState('');
+  const [registrationNotice, setRegistrationNotice] = useState('');
 
-import { useState } from "react";
-import Login from "./Login";
-import Dashboard from "./Dashboard";
+  const handleLogout = useCallback(() => {
+    authService.logout();
+    setCurrentUser(null);
+    setAuthView('login');
+  }, []);
 
-function App() {
-  const [user, setUser] = useState(() => {
-    const token = localStorage.getItem("token");
+  useEffect(() => {
+    let active = true;
 
-    if (token) {
-      return { loggedIn: true };
+    async function restoreSession() {
+      if (!getStoredToken()) {
+        setCheckingSession(false);
+        return;
+      }
+
+      try {
+        const response = await api.get('/profile');
+        if (active) setCurrentUser(response.data.profile);
+      } catch (error) {
+        clearStoredToken();
+        if (active && error.response?.status !== 401) {
+          setSessionError(
+            error.response?.data?.message || 'Unable to verify your session. Please sign in again.',
+          );
+        }
+      } finally {
+        if (active) setCheckingSession(false);
+      }
     }
 
-    return null;
-  });
+    restoreSession();
+    return () => {
+      active = false;
+    };
+  }, []);
 
-  const handleLoginSuccess = (userData) => {
-    setUser(userData || { loggedIn: true });
-  };
+  if (checkingSession) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#071421] p-6 text-[#c9d9e8]">
+        <p role="status">Checking your session…</p>
+      </main>
+    );
+  }
 
-  const handleLogout = () => {
-    setUser(null);
-  };
+  if (currentUser) {
+    return <Dashboard user={currentUser} onLogout={handleLogout} />;
+  }
 
-  return user ? (
-    <Dashboard onLogout={handleLogout} />
+  return authView === 'login' ? (
+    <Login
+      onSwitchToRegister={() => setAuthView('register')}
+      onLoginSuccess={(user) => {
+        setCurrentUser(user);
+        setRegistrationNotice('');
+      }}
+      initialError={sessionError}
+      notice={registrationNotice}
+    />
   ) : (
-    <Login onLoginSuccess={handleLoginSuccess} />
+    <Register
+      onSwitchToLogin={() => setAuthView('login')}
+      onRegisterSuccess={() => {
+        setRegistrationNotice('Account created. Sign in to continue.');
+        setAuthView('login');
+      }}
+    />
   );
 }
-
-export default App;
-

@@ -1,16 +1,18 @@
-# React + Vite
+# SignBridge AI frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+The active React application uses `src/App.jsx`, screens under `src/pages/`, and the centralized API client under `src/services/`. The teammate-authored dashboard source remains under `src/pradnya-integration/` as a design reference; the active dashboard is inspired by its structure and uses the existing backend integrations.
 
-Currently, two official plugins are available:
+Tailwind CSS v4 is already installed and configured through `@tailwindcss/vite` in `vite.config.js`. Global Tailwind imports and the SignBridge palette are defined in `src/index.css`. The dashboard shell, responsive navigation, page layouts, overview cards, shared card surfaces, buttons, settings navigation, and screen grids use Tailwind utilities. Specialized media, toggles, and detailed lesson/quiz presentation remain in `src/pages/Dashboard.css`.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+From this directory:
 
-## React Compiler
+```sh
+npm ci
+npm run dev
+npm run lint
+npm run build
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The Vite development server runs on port `5173`. API requests default to `/api` and are proxied to `http://localhost:5000`. Copy `.env.example` to `.env` to configure the development proxy target; set `VITE_API_BASE_URL` to the API base URL for a separately deployed backend.
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+See the repository [README](../README.md) for backend setup, environment variables, API contracts, and feature status.

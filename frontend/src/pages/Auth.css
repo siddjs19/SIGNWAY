@@ -1,0 +1,322 @@
+/* ==========================================================================
+   SignBridge AI — Auth Screens (Midnight Navy & Signal Teal Future Theme)
+   Colors:
+   - Midnight Navy: #071421
+   - Signal Teal: #5CE1D6
+   - AI Violet: #9275FF
+   - Soft White: #F4F7FA
+   - Slate Blue: #183041
+   - Success Mint: #A7F3D0
+   ========================================================================== */
+
+:root {
+  --sb-midnight: #071421;
+  --sb-slate-blue: #183041;
+  --sb-slate-card: #0f2232;
+  --sb-slate-elevated: #152d40;
+  --sb-slate-border: rgba(92, 225, 214, 0.2);
+  --sb-slate-hover: #1e3c54;
+
+  --sb-signal-teal: #5CE1D6;
+  --sb-ai-violet: #9275FF;
+  --sb-soft-white: #F4F7FA;
+  --sb-success-mint: #A7F3D0;
+
+  --sb-teal-glow: rgba(92, 225, 214, 0.35);
+  --sb-violet-glow: rgba(146, 117, 255, 0.25);
+  
+  --sb-text-title: #F4F7FA;
+  --sb-text-body: #C9D9E8;
+  --sb-text-muted: #8197AB;
+  --sb-error: #F87171;
+}
+
+.sb-auth-wrapper {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--sb-midnight);
+  background-image: 
+    radial-gradient(at 15% 15%, rgba(146, 117, 255, 0.16) 0px, transparent 55%),
+    radial-gradient(at 85% 85%, rgba(92, 225, 214, 0.15) 0px, transparent 50%),
+    radial-gradient(at 50% 50%, rgba(24, 48, 65, 0.4) 0px, transparent 100%);
+  padding: 1.5rem;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  color: var(--sb-text-body);
+  box-sizing: border-box;
+}
+
+.sb-auth-card {
+  width: 100%;
+  max-width: 480px;
+  background: rgba(15, 34, 50, 0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--sb-slate-border);
+  border-radius: 24px;
+  padding: 2.6rem;
+  box-shadow: 0 24px 48px -12px rgba(3, 10, 18, 0.85), 0 0 24px rgba(92, 225, 214, 0.12);
+  position: relative;
+  overflow: hidden;
+}
+
+.sb-auth-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--sb-ai-violet), var(--sb-signal-teal), var(--sb-success-mint));
+}
+
+.sb-brand {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.sb-logo-badge {
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, var(--sb-ai-violet), var(--sb-signal-teal));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.9rem;
+  margin-bottom: 0.9rem;
+  box-shadow: 0 8px 24px var(--sb-teal-glow);
+  color: var(--sb-midnight);
+}
+
+.sb-title {
+  font-size: 1.85rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--sb-soft-white);
+  margin: 0;
+}
+
+.sb-title span {
+  color: var(--sb-signal-teal);
+  text-shadow: 0 0 16px var(--sb-teal-glow);
+}
+
+.sb-subtitle {
+  font-size: 0.88rem;
+  color: var(--sb-text-muted);
+  margin-top: 0.4rem;
+  line-height: 1.4;
+}
+
+/* Tabs */
+.sb-tabs {
+  display: flex;
+  background: rgba(7, 20, 33, 0.6);
+  border: 1px solid rgba(92, 225, 214, 0.15);
+  border-radius: 14px;
+  padding: 5px;
+  margin-bottom: 1.8rem;
+}
+
+.sb-tab-btn {
+  flex: 1;
+  padding: 0.7rem;
+  border: none;
+  background: transparent;
+  color: var(--sb-text-muted);
+  font-size: 0.88rem;
+  font-weight: 700;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sb-tab-btn:hover {
+  color: var(--sb-soft-white);
+}
+
+.sb-tab-btn.active {
+  background: var(--sb-slate-blue);
+  color: var(--sb-signal-teal);
+  box-shadow: 0 4px 14px rgba(3, 10, 18, 0.6), 0 0 10px rgba(92, 225, 214, 0.2);
+  border: 1px solid rgba(92, 225, 214, 0.3);
+}
+
+/* Form Elements */
+.sb-form-group {
+  margin-bottom: 1.25rem;
+}
+
+.sb-label {
+  display: block;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--sb-text-title);
+  margin-bottom: 0.45rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sb-input-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.sb-input-box svg.icon-left {
+  position: absolute;
+  left: 14px;
+  color: var(--sb-signal-teal);
+  width: 18px;
+  height: 18px;
+  opacity: 0.85;
+}
+
+.sb-input, .sb-select {
+  width: 100%;
+  padding: 0.8rem 1rem 0.8rem 2.6rem;
+  background: rgba(7, 20, 33, 0.7);
+  border: 1px solid rgba(92, 225, 214, 0.2);
+  border-radius: 12px;
+  color: var(--sb-soft-white);
+  font-size: 0.92rem;
+  box-sizing: border-box;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  outline: none;
+}
+
+.sb-input::placeholder {
+  color: rgba(129, 151, 171, 0.6);
+}
+
+.sb-select {
+  padding-left: 1.1rem;
+  cursor: pointer;
+  background-color: var(--sb-slate-card);
+}
+
+.sb-input:focus, .sb-select:focus {
+  border-color: var(--sb-signal-teal);
+  background: rgba(15, 34, 50, 0.95);
+  box-shadow: 0 0 0 3px rgba(92, 225, 214, 0.2);
+}
+
+.sb-toggle-pwd {
+  position: absolute;
+  right: 14px;
+  background: none;
+  border: none;
+  color: var(--sb-signal-teal);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.2rem 0.4rem;
+  border-radius: 6px;
+  transition: opacity 0.2s;
+}
+
+.sb-toggle-pwd:hover {
+  text-shadow: 0 0 8px var(--sb-teal-glow);
+}
+
+.sb-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.sb-row-flex {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.82rem;
+  color: var(--sb-text-muted);
+  margin-top: 0.5rem;
+}
+
+.sb-row-flex a {
+  color: var(--sb-signal-teal);
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.2s, text-shadow 0.2s;
+}
+
+.sb-row-flex a:hover {
+  text-decoration: underline;
+  text-shadow: 0 0 8px var(--sb-teal-glow);
+}
+
+.sb-error-text {
+  font-size: 0.8rem;
+  color: var(--sb-error);
+  background: rgba(248, 113, 113, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  padding: 0.6rem 0.8rem;
+  border-radius: 10px;
+  margin-top: 0.4rem;
+}
+
+/* Submit Button */
+.sb-submit-btn {
+  width: 100%;
+  margin-top: 1.5rem;
+  padding: 0.95rem;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(135deg, var(--sb-signal-teal), #3bc5ba);
+  color: var(--sb-midnight);
+  font-size: 0.98rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow: 0 6px 20px var(--sb-teal-glow);
+  transition: all 0.2s ease;
+}
+
+.sb-submit-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 28px rgba(92, 225, 214, 0.45);
+  background: linear-gradient(135deg, #74ebe2, var(--sb-signal-teal));
+}
+
+.sb-submit-btn:active {
+  transform: translateY(0);
+}
+
+.sb-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Guest / Demo Footer */
+.sb-guest-footer {
+  margin-top: 1.6rem;
+  padding-top: 1.3rem;
+  border-top: 1px solid rgba(92, 225, 214, 0.14);
+  text-align: center;
+}
+
+.sb-guest-btn {
+  background: rgba(146, 117, 255, 0.12);
+  border: 1px solid rgba(146, 117, 255, 0.3);
+  color: var(--sb-ai-violet);
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.6rem 1.2rem;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sb-guest-btn:hover {
+  background: rgba(146, 117, 255, 0.22);
+  color: #c4b5fd;
+  border-color: var(--sb-ai-violet);
+  box-shadow: 0 0 14px var(--sb-violet-glow);
+}
