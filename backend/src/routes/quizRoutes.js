@@ -6,13 +6,12 @@ const Lesson = require('../models/Lesson');
 const auth = require('../middleware/auth');
 
 const router = express.Router();
-const COURSE_PASSING_SCORE = 70;
 const MINIMUM_COURSE_QUESTIONS = 5;
 const MINIMUM_COURSE_LESSONS = 2;
 
 router.use(auth);
 
-async function getCourseAssessment() {
+async function getCourseAssessment(assessmentFocus = 'isl-learning') {
   const lessons = await Lesson.find({ published: true })
     .select('_id title order')
     .sort({ order: 1 })
@@ -20,17 +19,37 @@ async function getCourseAssessment() {
   const lessonById = new Map(lessons.map(lesson => [String(lesson._id), lesson]));
 
   if (lessons.length === 0) {
-    return { questions: [], lessons: [], quizzes: [] };
+    return {
+      questions: [],
+      lessons: [],
+      quizzes: [],
+      excludedMetadataQuestions: 0,
+      excludedReviewPendingQuestions: 0,
+      passingScore: null,
+      assessmentFocus,
+    };
   }
 
-  const quizzes = await Quiz.find({
+  const publishedQuizzes = await Quiz.find({
     published: true,
     lesson: { $in: lessons.map(lesson => lesson._id) },
   })
-    .select('_id lesson title questions')
+    .select('_id lesson title questions assessmentFocus contentReviewStatus passingScore')
     .sort({ createdAt: 1 })
     .lean();
+  const excludedMetadataQuestions = publishedQuizzes
+    .filter(quiz => quiz.assessmentFocus !== 'isl-learning')
+    .reduce((total, quiz) => total + (quiz.questions || []).length, 0);
+  const excludedReviewPendingQuestions = publishedQuizzes
+    .filter(quiz => quiz.assessmentFocus === 'isl-learning' && quiz.contentReviewStatus !== 'reviewed')
+    .reduce((total, quiz) => total + (quiz.questions || []).length, 0);
+  const quizzes = publishedQuizzes.filter(quiz => (
+    assessmentFocus === 'isl-learning'
+      ? quiz.assessmentFocus === 'isl-learning' && quiz.contentReviewStatus === 'reviewed'
+      : quiz.assessmentFocus !== 'isl-learning'
+  ));
   const questionsByLesson = new Map();
+  const seenPrompts = new Set();
 
   for (const quiz of quizzes) {
     const lesson = lessonById.get(String(quiz.lesson));
@@ -38,6 +57,9 @@ async function getCourseAssessment() {
 
     const lessonQuestions = questionsByLesson.get(String(lesson._id)) || [];
     for (const question of quiz.questions || []) {
+      const normalizedPrompt = question.prompt.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
+      if (!normalizedPrompt || seenPrompts.has(normalizedPrompt)) continue;
+      seenPrompts.add(normalizedPrompt);
       lessonQuestions.push({
         _id: question._id,
         quizId: quiz._id,
@@ -67,10 +89,25 @@ async function getCourseAssessment() {
   }
 
   const coveredLessons = [...new Set(questions.map(question => String(question.lessonId)))];
+  const selectedQuizIds = new Set(questions.map(question => String(question.quizId)));
+  const selectedQuizzes = quizzes.filter(quiz => selectedQuizIds.has(String(quiz._id)));
+  const passingScores = assessmentFocus === 'isl-learning'
+    ? [...new Set(
+      selectedQuizzes
+        .map(quiz => quiz.passingScore)
+        .filter(score => Number.isFinite(score) && score >= 0 && score <= 100),
+    )]
+    : [];
   return {
     questions,
     lessons: lessons.filter(lesson => coveredLessons.includes(String(lesson._id))),
-    quizzes,
+    quizzes: selectedQuizzes,
+    excludedMetadataQuestions: assessmentFocus === 'isl-learning' ? excludedMetadataQuestions : 0,
+    excludedReviewPendingQuestions: assessmentFocus === 'isl-learning'
+      ? excludedReviewPendingQuestions
+      : 0,
+    passingScore: passingScores.length === 1 ? passingScores[0] : null,
+    assessmentFocus,
   };
 }
 
@@ -82,12 +119,35 @@ function isCourseAvailable(assessment) {
 function courseUnavailableReason(assessment) {
   const needed = [];
   if (assessment.questions.length < MINIMUM_COURSE_QUESTIONS) {
-    needed.push(`at least ${MINIMUM_COURSE_QUESTIONS} published questions`);
+    needed.push(`at least ${MINIMUM_COURSE_QUESTIONS} qualified-review ISL learning questions`);
   }
   if (assessment.lessons.length < MINIMUM_COURSE_LESSONS) {
-    needed.push(`published questions from at least ${MINIMUM_COURSE_LESSONS} lessons`);
+    needed.push(`qualified-review ISL learning questions from at least ${MINIMUM_COURSE_LESSONS} published lessons`);
   }
-  return `The full-course test needs ${needed.join(' and ')}. The current published question pool has ${assessment.questions.length} questions across ${assessment.lessons.length} lessons.`;
+  const excluded = [];
+  if (assessment.excludedMetadataQuestions > 0) {
+    excluded.push(`${assessment.excludedMetadataQuestions} course-metadata question(s) excluded`);
+  }
+  if (assessment.excludedReviewPendingQuestions > 0) {
+    excluded.push(`${assessment.excludedReviewPendingQuestions} learning question(s) awaiting qualified review excluded`);
+  }
+  return `The full-course test needs ${needed.join(' and ')}. The eligible pool has ${assessment.questions.length} qualified-review learning questions across ${assessment.lessons.length} lessons.${excluded.length ? ` ${excluded.join('; ')}.` : ''}`;
+}
+
+async function getAvailableCourseAssessment() {
+  const learningAssessment = await getCourseAssessment('isl-learning');
+  if (isCourseAvailable(learningAssessment)) {
+    return learningAssessment;
+  }
+
+  const resourceAssessment = await getCourseAssessment('course-metadata');
+  return isCourseAvailable(resourceAssessment) ? resourceAssessment : learningAssessment;
+}
+
+function courseAssessmentTitle(assessment) {
+  return assessment.assessmentFocus === 'course-metadata'
+    ? 'Full-course resource check'
+    : 'Full-course test';
 }
 
 function questionForLearner(question) {
@@ -170,7 +230,7 @@ router.get('/', async (req, res) => {
       published: true,
       lesson: { $in: lessons.map(lesson => lesson._id) },
     })
-      .select('title lesson questions')
+      .select('title lesson questions contentReviewStatus assessmentFocus')
       .sort({ createdAt: 1 })
       .lean();
 
@@ -184,6 +244,8 @@ router.get('/', async (req, res) => {
           lesson: quiz.lesson,
           lessonTitle: lessonById.get(String(quiz.lesson)).title,
           questionCount: quiz.questions.length,
+          contentReviewStatus: quiz.contentReviewStatus,
+          assessmentFocus: quiz.assessmentFocus || 'course-metadata',
         })),
     });
   } catch (error) {
@@ -194,19 +256,29 @@ router.get('/', async (req, res) => {
 
 router.get('/full-course', async (req, res) => {
   try {
-    const assessment = await getCourseAssessment();
+    const assessment = await getAvailableCourseAssessment();
+    const learningAssessment = assessment.assessmentFocus === 'isl-learning'
+      ? assessment
+      : await getCourseAssessment('isl-learning');
     const available = isCourseAvailable(assessment);
 
     return res.json({
       success: true,
       data: {
         available,
-        title: 'Full-course test',
-        scope: 'Published lessons with published quizzes',
+        title: courseAssessmentTitle(assessment),
+        assessmentFocus: assessment.assessmentFocus,
+        scope: assessment.assessmentFocus === 'course-metadata'
+          ? 'Verified course and resource metadata from published lessons; this is not an ISL proficiency assessment'
+          : 'Reviewed ISL-learning questions from published lessons',
         questionCount: assessment.questions.length,
         lessonCount: assessment.lessons.length,
         lessons: assessment.lessons.map(({ _id, title }) => ({ _id, title })),
-        passingScore: COURSE_PASSING_SCORE,
+        learningAssessmentAvailable: isCourseAvailable(learningAssessment),
+        learningQuestionCount: learningAssessment.questions.length,
+        excludedMetadataQuestionCount: assessment.excludedMetadataQuestions,
+        excludedReviewPendingQuestionCount: assessment.excludedReviewPendingQuestions,
+        ...(assessment.passingScore === null ? {} : { passingScore: assessment.passingScore }),
         ...(available ? {} : { reason: courseUnavailableReason(assessment) }),
       },
     });
@@ -218,7 +290,7 @@ router.get('/full-course', async (req, res) => {
 
 router.get('/full-course/questions', async (req, res) => {
   try {
-    const assessment = await getCourseAssessment();
+    const assessment = await getAvailableCourseAssessment();
     if (!isCourseAvailable(assessment)) {
       return res.status(409).json({
         success: false,
@@ -229,8 +301,12 @@ router.get('/full-course/questions', async (req, res) => {
     return res.json({
       success: true,
       data: {
-        title: 'Full-course test',
-        passingScore: COURSE_PASSING_SCORE,
+        title: courseAssessmentTitle(assessment),
+        assessmentFocus: assessment.assessmentFocus,
+        scope: assessment.assessmentFocus === 'course-metadata'
+          ? 'Verified course and resource metadata from published lessons; this is not an ISL proficiency assessment'
+          : 'Reviewed ISL-learning questions from published lessons',
+        ...(assessment.passingScore === null ? {} : { passingScore: assessment.passingScore }),
         questions: assessment.questions.map(questionForLearner),
       },
     });
@@ -242,7 +318,7 @@ router.get('/full-course/questions', async (req, res) => {
 
 router.post('/full-course/attempts', async (req, res) => {
   try {
-    const assessment = await getCourseAssessment();
+    const assessment = await getAvailableCourseAssessment();
     if (!isCourseAvailable(assessment)) {
       return res.status(409).json({
         success: false,
@@ -275,14 +351,18 @@ router.post('/full-course/attempts', async (req, res) => {
         score: Math.round((lessonCorrect / lessonAnswers.length) * 100),
       };
     });
-    const passed = score >= COURSE_PASSING_SCORE;
+    const passed = assessment.passingScore === null
+      ? null
+      : score >= assessment.passingScore;
     const attempt = await QuizAttempt.create({
       user: req.user._id,
       quiz: null,
       mode: 'full-course',
+      assessmentFocus: assessment.assessmentFocus,
       quizzes: [...new Set(assessment.questions.map(question => String(question.quizId)))],
       lessonBreakdown,
       score,
+      passingScore: assessment.passingScore,
       total,
       answers,
       passed,
@@ -293,10 +373,13 @@ router.post('/full-course/attempts', async (req, res) => {
       data: {
         attemptId: attempt._id,
         mode: 'full-course',
+        assessmentFocus: assessment.assessmentFocus,
         score,
+        percentage: score,
         total,
-        passed,
-        passingScore: COURSE_PASSING_SCORE,
+        ...(assessment.passingScore === null
+          ? {}
+          : { passed, passingScore: assessment.passingScore }),
         lessonBreakdown,
         answers,
       },
@@ -339,6 +422,8 @@ router.get('/:id', async (req, res) => {
         lesson: quiz.lesson,
         lessonTitle: lesson.title,
         passingScore: quiz.passingScore,
+        contentReviewStatus: quiz.contentReviewStatus,
+        assessmentFocus: quiz.assessmentFocus || 'course-metadata',
         questions: quiz.questions.map(question => ({
           _id: question._id,
           prompt: question.prompt,
@@ -390,6 +475,7 @@ router.post('/:id/attempts', async (req, res) => {
       user: req.user._id,
       quiz: quiz._id,
       mode: 'lesson',
+      assessmentFocus: quiz.assessmentFocus || 'course-metadata',
       score,
       total,
       answers,
@@ -400,6 +486,7 @@ router.post('/:id/attempts', async (req, res) => {
       success: true,
       data: {
         attemptId: attempt._id,
+        assessmentFocus: quiz.assessmentFocus || 'course-metadata',
         score,
         total,
         passed,

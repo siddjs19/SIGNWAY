@@ -18,6 +18,11 @@ const quizAttemptSchema = new mongoose.Schema(
       enum: ['lesson', 'full-course'],
       default: 'lesson',
     },
+    assessmentFocus: {
+      type: String,
+      enum: ['isl-learning', 'course-metadata'],
+      default: 'course-metadata',
+    },
     quizzes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Quiz' }],
     lessonBreakdown: [{
       lesson: { type: mongoose.Schema.Types.ObjectId, ref: 'Lesson' },
@@ -27,6 +32,7 @@ const quizAttemptSchema = new mongoose.Schema(
       score: Number,
     }],
     score: { type: Number, required: true },
+    passingScore: { type: Number, default: null },
     total: { type: Number, required: true },
     answers: [{
       questionId: mongoose.Schema.Types.ObjectId,

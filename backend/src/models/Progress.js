@@ -20,6 +20,35 @@ const progressSchema = new mongoose.Schema(
       default: 0,
       min: 0
     },
+    inProgressLessons: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Lesson',
+    }],
+    lastAccessedLesson: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Lesson',
+      default: null,
+    },
+    lastAccessedAt: {
+      type: Date,
+      default: null,
+    },
+    recentLessonActivity: [{
+      lesson: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Lesson',
+        required: true,
+      },
+      activity: {
+        type: String,
+        enum: ['started', 'resumed', 'completed'],
+        required: true,
+      },
+      occurredAt: {
+        type: Date,
+        default: Date.now,
+      },
+    }],
 
     achievements: {
       type: [String],

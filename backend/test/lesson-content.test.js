@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 
 const Lesson = require('../src/models/Lesson');
 const Quiz = require('../src/models/Quiz');
-const { lessons, quizzes } = require('../src/seed');
+const { lessons, quizzes, starterQuizzes } = require('../src/seed');
 
 const playlistUrl = 'https://www.youtube.com/playlist?list=PLFjydPMg4DapfRTBMokl09Ht-fhMOAYf6';
 const expectedVideos = {
@@ -46,12 +46,42 @@ test('draft lesson quizzes only grade options and remain unpublished pending rev
   for (const quiz of quizzes) {
     assert.equal(quiz.published, false);
     assert.equal(quiz.contentReviewStatus, 'pending');
+    assert.equal(quiz.assessmentFocus, 'course-metadata');
     const lessonSlug = quiz.slug.replace(/-source-check$/, '');
     assert.ok(lessons.some(lesson => lesson.slug === lessonSlug), `missing lesson for ${quiz.slug}`);
     assert.ok(quiz.questions.length >= 2);
     for (const question of quiz.questions) {
       assert.ok(question.options.includes(question.correctAnswer));
     }
+    await assert.doesNotReject(
+      () => new Quiz({ ...quiz, lesson: '64b000000000000000000020' }).validate(),
+    );
+  }
+});
+
+test('starter quiz bank uses four-option verified course-resource facts without claiming ISL proficiency', async () => {
+  assert.equal(starterQuizzes.length, 3);
+  assert.equal(
+    starterQuizzes.reduce((count, quiz) => count + quiz.questions.length, 0),
+    12,
+  );
+
+  for (const quiz of starterQuizzes) {
+    assert.ok(quiz.slug.endsWith('-starter-check'));
+    assert.ok(lessons.some(lesson => lesson.slug === quiz.lessonSlug));
+    assert.equal(quiz.assessmentFocus, 'course-metadata');
+    assert.equal(quiz.contentReviewStatus, 'pending');
+    assert.equal(quiz.published, true);
+    assert.match(quiz.title, /resource check|course-resource check/i);
+    assert.ok(quiz.questions.length >= 4);
+
+    for (const question of quiz.questions) {
+      assert.equal(question.options.length, 4);
+      assert.equal(new Set(question.options).size, 4);
+      assert.ok(question.options.includes(question.correctAnswer));
+      assert.ok(question.explanation.length > 0);
+    }
+
     await assert.doesNotReject(
       () => new Quiz({ ...quiz, lesson: '64b000000000000000000020' }).validate(),
     );

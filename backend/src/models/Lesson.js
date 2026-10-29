@@ -45,6 +45,8 @@ const lessonSchema = new mongoose.Schema(
     description: { type: String, required: true },
     introduction: { type: String, default: '' },
     learningObjectives: { type: [String], default: [] },
+    keyTakeaways: { type: [String], default: [] },
+    completionChecklist: { type: [String], default: [] },
     contentReviewStatus: {
       type: String,
       enum: ['pending', 'reviewed'],

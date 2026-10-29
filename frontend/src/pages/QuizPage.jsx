@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   AlertCircle,
@@ -10,6 +10,7 @@ import {
   RotateCcw,
 } from 'lucide-react';
 import api from '../services/api';
+import AppSidebar from '../components/AppSidebar';
 
 const card = 'rounded-3xl border border-[rgba(92,225,214,0.14)] bg-[rgba(24,48,65,0.7)] shadow-sm backdrop-blur-xl';
 const button = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-sb-signal to-[#48e2d6] px-5 py-2.5 text-sm font-extrabold text-sb-midnight transition hover:opacity-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sb-signal disabled:cursor-not-allowed disabled:opacity-50';
@@ -29,10 +30,11 @@ function PageError({ children }) {
   );
 }
 
-export default function QuizPage({ onLogout }) {
+export default function QuizPage({ user, onLogout }) {
   const { lessonId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const submissionInFlight = useRef(false);
   const isFullCourse = location.pathname === '/quiz/full-course';
   const isLessonQuiz = Boolean(lessonId);
   const isDiscovery = !isFullCourse && !isLessonQuiz;
@@ -164,7 +166,8 @@ export default function QuizPage({ onLogout }) {
   };
 
   const submitAssessment = async () => {
-    if (!assessment) return;
+    if (!assessment || submissionInFlight.current) return;
+    submissionInFlight.current = true;
     setSubmitting(true);
     setError('');
     const submittedAnswers = assessment.questions.map(question => ({
@@ -185,6 +188,7 @@ export default function QuizPage({ onLogout }) {
       }
       setError(messageFrom(requestError, 'Unable to submit your answers. Your attempt has not been confirmed.'));
     } finally {
+      submissionInFlight.current = false;
       setSubmitting(false);
     }
   };
@@ -195,6 +199,14 @@ export default function QuizPage({ onLogout }) {
     setCurrentQuestion(0);
     setPhase('answering');
     setError('');
+  };
+
+  const handleSidebarNavigate = (id) => {
+    if (id === 'quizzes') {
+      navigate('/quiz');
+      return;
+    }
+    navigate('/', { state: { activeNav: id } });
   };
 
   const renderDiscovery = () => {
@@ -274,10 +286,12 @@ export default function QuizPage({ onLogout }) {
     <section className={`${card} space-y-6 p-6 sm:p-8`}>
       <div>
         <p className="text-xs font-bold uppercase tracking-[0.18em] text-sb-signal">Comprehensive assessment</p>
-        <h1 className="mt-2 text-2xl font-extrabold text-sb-soft sm:text-3xl">Full-course test</h1>
+        <h1 className="mt-2 text-2xl font-extrabold text-sb-soft sm:text-3xl">
+          {courseOverview?.title || 'Full-course test'}
+        </h1>
         <p className="mt-3 max-w-3xl leading-relaxed text-sb-body">
-          Scope: {courseOverview?.scope || 'Published lessons with published quizzes'}.
-          {' '}Questions are selected across the published course and graded by the backend.
+          Scope: {courseOverview?.scope || 'Reviewed ISL-learning questions from published lessons'}.
+          {' '}Eligible questions are selected across the published course and graded by the backend.
         </p>
       </div>
       {courseOverview?.available ? (
@@ -293,7 +307,9 @@ export default function QuizPage({ onLogout }) {
             </div>
             <div className="rounded-2xl bg-[rgba(7,20,33,0.55)] p-4">
               <dt className="text-sm text-sb-muted">Passing score</dt>
-              <dd className="mt-1 text-2xl font-extrabold text-sb-signal">{courseOverview.passingScore}%</dd>
+              <dd className="mt-1 text-2xl font-extrabold text-sb-signal">
+                {Number.isFinite(courseOverview.passingScore) ? `${courseOverview.passingScore}%` : 'Not set'}
+              </dd>
             </div>
           </dl>
           <div>
@@ -302,11 +318,29 @@ export default function QuizPage({ onLogout }) {
               {courseOverview.lessons.map(item => <li key={item._id}>{item.title}</li>)}
             </ul>
           </div>
-          <p className="rounded-xl border border-[rgba(92,225,214,0.14)] p-4 text-sm text-sb-muted">
-            No time limit or attempt restriction is configured. You can review and change answers before submission.
-          </p>
+          {courseOverview.assessmentFocus === 'course-metadata' ? (
+            <p className="rounded-xl border border-amber-300/25 bg-amber-300/5 p-4 text-sm leading-relaxed text-amber-100">
+              This is a course-resource check using verified titles and course facts, not an ISL language or proficiency assessment. The SignBridge question bank is pending qualified review. A reviewed ISL-learning full-course assessment is not yet available.
+            </p>
+          ) : (
+            <p className="rounded-xl border border-[rgba(92,225,214,0.14)] p-4 text-sm text-sb-muted">
+              This is a learning check, not a proficiency certification. Course-metadata checks and learning questions awaiting review are excluded. No time limit or attempt restriction is configured; you can review and change answers before submission.
+            </p>
+          )}
+          {(courseOverview.excludedMetadataQuestionCount > 0
+            || courseOverview.excludedReviewPendingQuestionCount > 0) && (
+            <p className="text-sm text-sb-muted">
+              Excluded from this test: {courseOverview.excludedMetadataQuestionCount} course-metadata questions and{' '}
+              {courseOverview.excludedReviewPendingQuestionCount} learning questions awaiting review.
+            </p>
+          )}
           <button type="button" className={button} onClick={startCourseTest} disabled={loading}>
-            {loading ? 'Loading test…' : 'Start full-course test'} <ArrowRight size={16} />
+            {loading
+              ? 'Loading assessment…'
+              : courseOverview.assessmentFocus === 'course-metadata'
+                ? 'Start course-resource check'
+                : 'Start full-course test'}
+            {' '}<ArrowRight size={16} />
           </button>
         </>
       ) : (
@@ -327,6 +361,16 @@ export default function QuizPage({ onLogout }) {
     if (!currentQuestionData) return null;
     return (
       <section className={`${card} space-y-6 p-5 sm:p-8`} aria-labelledby="question-title">
+        {isLessonQuiz && assessment.contentReviewStatus !== 'reviewed' && (
+          <p className="rounded-xl border border-amber-300/25 bg-amber-300/5 p-4 text-sm leading-relaxed text-amber-100">
+            This quiz is awaiting qualified content review. Treat its SignBridge-authored questions as unverified learning material.
+          </p>
+        )}
+        {isLessonQuiz && assessment.assessmentFocus === 'course-metadata' && (
+          <p className="rounded-xl border border-[rgba(92,225,214,0.14)] p-4 text-sm leading-relaxed text-sb-muted">
+            This quiz checks course and resource information; it is not an assessment of ISL language skills.
+          </p>
+        )}
         {isLessonQuiz && quizzes.length > 1 && (
           <div className="flex flex-wrap gap-2" aria-label="Available quizzes for this lesson">
             {quizzes.map(quiz => (
@@ -467,14 +511,24 @@ export default function QuizPage({ onLogout }) {
 
   const renderResult = () => {
     const resultAnswers = new Map((result?.answers || []).map(answer => [String(answer.questionId), answer]));
+    const passLabel = result.assessmentFocus === 'course-metadata'
+      ? result.passed ? 'Resource check passed' : 'Resource check below threshold'
+      : result.passed ? 'Passed' : 'Keep practicing';
     return (
       <div className="space-y-5">
         <section className={`${card} p-6 text-center sm:p-8`} role="status">
-          <p className="text-xs font-bold uppercase tracking-[0.16em] text-sb-signal">Backend-graded result</p>
+          <p className="text-xs font-bold uppercase tracking-[0.16em] text-sb-signal">
+            {result.assessmentFocus === 'course-metadata'
+              ? 'Backend-graded resource-check result · not ISL proficiency'
+              : 'Backend-graded result'}
+          </p>
           <p className="mt-3 text-5xl font-extrabold text-sb-soft">{result.score}%</p>
           <p className="mt-2 text-sb-body">
-            {result.total} questions · {result.passed ? 'Passed' : 'Keep practicing'}
-            {result.passingScore ? ` · Passing score ${result.passingScore}%` : ''}
+            {result.total} questions · {result.percentage ?? result.score}% overall
+            {typeof result.passed === 'boolean'
+              ? ` · ${passLabel}`
+              : ''}
+            {Number.isFinite(result.passingScore) ? ` · Passing score ${result.passingScore}%` : ''}
           </p>
           {result.attemptId && <p className="mt-2 text-xs text-sb-muted">Attempt saved</p>}
         </section>
@@ -535,8 +589,15 @@ export default function QuizPage({ onLogout }) {
   };
 
   return (
-    <main className="min-h-screen bg-[#071421] bg-[radial-gradient(at_0%_0%,rgba(146,117,255,0.12)_0px,transparent_45%),radial-gradient(at_100%_100%,rgba(92,225,214,0.1)_0px,transparent_45%)] px-4 py-6 text-[#c9d9e8] sm:px-7 sm:py-9">
-      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+    <div className="flex h-screen min-w-0 overflow-hidden bg-[#071421] bg-[radial-gradient(at_0%_0%,rgba(146,117,255,0.12)_0px,transparent_45%),radial-gradient(at_100%_100%,rgba(92,225,214,0.1)_0px,transparent_45%)] text-[#c9d9e8]">
+      <AppSidebar
+        activeNav="quizzes"
+        user={user}
+        onNavigate={handleSidebarNavigate}
+        onLogout={onLogout}
+      />
+      <main className="flex min-w-0 flex-1 flex-col overflow-y-auto bg-transparent px-4 py-6 sm:px-7 sm:py-9">
+        <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <Link className={secondaryButton} to="/">
             <ArrowLeft size={15} /> Dashboard
@@ -562,7 +623,8 @@ export default function QuizPage({ onLogout }) {
         {!loading && phase === 'answering' && assessment && renderQuestion()}
         {!loading && phase === 'review' && assessment && renderReview()}
         {!loading && phase === 'result' && assessment && result && renderResult()}
-      </div>
-    </main>
+        </div>
+      </main>
+    </div>
   );
 }

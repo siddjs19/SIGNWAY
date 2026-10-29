@@ -70,9 +70,9 @@ function SignBridgeApplication() {
     return (
       <Routes>
         <Route path="/" element={<Dashboard user={currentUser} onLogout={handleLogout} />} />
-        <Route path="/quiz" element={<QuizPage onLogout={handleLogout} />} />
-        <Route path="/quiz/lesson/:lessonId" element={<QuizPage onLogout={handleLogout} />} />
-        <Route path="/quiz/full-course" element={<QuizPage onLogout={handleLogout} />} />
+        <Route path="/quiz" element={<QuizPage user={currentUser} onLogout={handleLogout} />} />
+        <Route path="/quiz/lesson/:lessonId" element={<QuizPage user={currentUser} onLogout={handleLogout} />} />
+        <Route path="/quiz/full-course" element={<QuizPage user={currentUser} onLogout={handleLogout} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );

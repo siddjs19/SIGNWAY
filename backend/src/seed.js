@@ -53,6 +53,16 @@ const lessons = [
       'Recall the module count and stated duration in the playlist description.',
       'Distinguish official course metadata from SignBridge-authored material awaiting review.',
     ],
+    keyTakeaways: [
+      'ISLRTC identifies the playlist as a Basic Communication Skills course in Indian Sign Language.',
+      'The playlist description states 10 modules, 30 topics, and a 40-hour learning duration.',
+      'Verified titles and course metadata do not independently verify individual sign instruction.',
+    ],
+    completionChecklist: [
+      'Watch the linked ISLRTC Guideline resource.',
+      'Recall the module, topic, and duration details stated in the playlist description.',
+      'Distinguish verified source information from sign content awaiting qualified review.',
+    ],
     contentReviewStatus: 'pending',
     contentReviewNote: 'SignBridge-authored explanations and quiz questions require review by a qualified ISL educator. The external video title and publisher were verified; no individual sign claim is made.',
     level: 'beginner',
@@ -73,6 +83,16 @@ const lessons = [
       'Locate the ISLRTC resources identified by their titles as greetings/salutations and polite phrases.',
       'Use the official videos as the source for observing the demonstrated material.',
       'Avoid treating SignBridge-authored text as verified sign instruction.',
+    ],
+    keyTakeaways: [
+      'The linked ISLRTC titles identify one greetings/salutations resource and one polite-phrases resource.',
+      'The titles establish the publisher-stated topics, not the correctness of individual sign demonstrations.',
+      'The SignBridge-authored lesson text and quiz remain pending qualified ISL review.',
+    ],
+    completionChecklist: [
+      'Watch both linked ISLRTC resources.',
+      'Identify which resource title covers greetings and which names polite useful phrases.',
+      'Treat the video as the source for its demonstrations; SignBridge has not independently reviewed individual signs.',
     ],
     contentReviewStatus: 'pending',
     contentReviewNote: 'Only video titles, publisher metadata, availability, and embeddability were checked. Sign content and SignBridge-authored quiz require qualified ISL review.',
@@ -100,6 +120,16 @@ const lessons = [
       'Watch the official resource for its demonstrations rather than relying on unreviewed SignBridge sign descriptions.',
       'Separate verified source metadata from SignBridge-authored learning content.',
     ],
+    keyTakeaways: [
+      'The verified Module 2.2 title names introducing oneself and lists name, work, and place.',
+      'A resource title identifies its topic but does not establish the exact sign forms or linguistic use.',
+      'The SignBridge-authored lesson text and quiz remain pending qualified ISL review.',
+    ],
+    completionChecklist: [
+      'Watch the linked ISLRTC Module 2.2 resource.',
+      'Recall the topics named in its verified title: name, work, and place.',
+      'Do not treat the title or SignBridge-authored notes as independent verification of signs.',
+    ],
     contentReviewStatus: 'pending',
     contentReviewNote: 'The video title, publisher metadata, availability, and embeddability were verified. Visual instruction and SignBridge-authored quiz require qualified ISL review.',
     level: 'beginner',
@@ -121,6 +151,7 @@ const quizzes = [
   {
     slug: 'isl-introduction-source-check',
     title: 'Introduction: source and course facts',
+    assessmentFocus: 'course-metadata',
     passingScore: 70,
     contentReviewStatus: 'pending',
     published: false,
@@ -152,6 +183,7 @@ const quizzes = [
   {
     slug: 'isl-greetings-polite-expressions-source-check',
     title: 'Greetings and polite expressions: source check',
+    assessmentFocus: 'course-metadata',
     passingScore: 70,
     contentReviewStatus: 'pending',
     published: false,
@@ -190,6 +222,7 @@ const quizzes = [
   {
     slug: 'introducing-yourself-in-isl-source-check',
     title: 'Introducing yourself: source check',
+    assessmentFocus: 'course-metadata',
     passingScore: 70,
     contentReviewStatus: 'pending',
     published: false,
@@ -224,6 +257,156 @@ const quizzes = [
   },
 ];
 
+const starterQuizzes = [
+  {
+    slug: 'isl-introduction-starter-check',
+    lessonSlug: 'isl-introduction',
+    title: 'Introduction: ISLRTC course-resource check',
+    assessmentFocus: 'course-metadata',
+    contentReviewStatus: 'pending',
+    published: true,
+    questions: [
+      {
+        prompt: 'Which organization is identified as the publisher of this basic communication course?',
+        options: [
+          'Indian Sign Language Research and Training Centre',
+          'SignBridge AI',
+          'National Association of the Deaf',
+          'A university language department',
+        ],
+        correctAnswer: 'Indian Sign Language Research and Training Centre',
+        explanation: 'The official playlist and video metadata identify ISLRTC as the source. This checks source attribution, not ISL proficiency.',
+      },
+      {
+        prompt: 'According to the official playlist description, how many modules does the course comprise?',
+        options: ['5', '10', '20', '30'],
+        correctAnswer: '10',
+        explanation: 'The playlist description states that the course comprises 10 modules.',
+      },
+      {
+        prompt: 'How many topics does the official playlist description say the course covers?',
+        options: ['10', '20', '30', '40'],
+        correctAnswer: '30',
+        explanation: 'The official course description states 30 topics across 10 modules.',
+      },
+      {
+        prompt: 'What learning duration does the official course description state?',
+        options: ['10 hours', '20 hours', '30 hours', '40 hours'],
+        correctAnswer: '40 hours',
+        explanation: 'The playlist description gives a stated duration of 40 hours, not a guarantee of individual study time.',
+      },
+    ],
+  },
+  {
+    slug: 'isl-greetings-polite-expressions-starter-check',
+    lessonSlug: 'isl-greetings-polite-expressions',
+    title: 'Greetings and polite expressions: resource check',
+    assessmentFocus: 'course-metadata',
+    contentReviewStatus: 'pending',
+    published: true,
+    questions: [
+      {
+        prompt: 'Which ISLRTC resource title explicitly names greetings and salutations?',
+        options: [
+          'Module 1.2 Greeting and salutations in Indian Sign Language',
+          'Module 1.3 Some polite useful phrases.',
+          'Module 2.2 Introducing oneself (name, work, place, etc.)',
+          'Basic Communication Skills: Course Overview',
+        ],
+        correctAnswer: 'Module 1.2 Greeting and salutations in Indian Sign Language',
+        explanation: 'This is the verified title of the linked ISLRTC resource. The quiz does not assert how any greeting is signed.',
+      },
+      {
+        prompt: 'Which linked resource title names polite useful phrases?',
+        options: [
+          'Module 1.3 Some polite useful phrases.',
+          'Module 1.2 Greeting and salutations in Indian Sign Language',
+          'Module 1.4 Quiz',
+          'Guideline',
+        ],
+        correctAnswer: 'Module 1.3 Some polite useful phrases.',
+        explanation: 'The verified playlist and video metadata use this title for the polite-phrases resource.',
+      },
+      {
+        prompt: 'What does the verified title of Module 1.2 establish?',
+        options: [
+          'It is a resource titled about greetings and salutations',
+          'Every sign in the video has been independently reviewed by SignBridge',
+          'It certifies a learner’s fluency',
+          'It provides a verified transcript of every sign',
+        ],
+        correctAnswer: 'It is a resource titled about greetings and salutations',
+        explanation: 'A verified title establishes the resource topic as named by its publisher; it does not independently verify each sign demonstration.',
+      },
+      {
+        prompt: 'Which statement is supported by the checked resource metadata?',
+        options: [
+          'The lesson links to two ISLRTC videos whose titles cover greetings and polite phrases',
+          'SignBridge has verified every sign shown in both videos',
+          'The videos guarantee conversational fluency',
+          'The videos contain identical lessons',
+        ],
+        correctAnswer: 'The lesson links to two ISLRTC videos whose titles cover greetings and polite phrases',
+        explanation: 'The linked video titles identify greetings/salutations and polite phrases. Their visual instruction has not been independently reviewed here.',
+      },
+    ],
+  },
+  {
+    slug: 'introducing-yourself-in-isl-starter-check',
+    lessonSlug: 'introducing-yourself-in-isl',
+    title: 'Introducing yourself: resource check',
+    assessmentFocus: 'course-metadata',
+    contentReviewStatus: 'pending',
+    published: true,
+    questions: [
+      {
+        prompt: 'Which topics are explicitly named in the linked Module 2.2 title?',
+        options: [
+          'Name, work, and place',
+          'Greetings, colors, and food',
+          'Numbers, money, and directions',
+          'Family, travel, and weather',
+        ],
+        correctAnswer: 'Name, work, and place',
+        explanation: 'The verified title is “Module 2.2 Introducing oneself (name, work, place, etc.).”',
+      },
+      {
+        prompt: 'What is the verified title of the linked ISLRTC video?',
+        options: [
+          'Module 2.2 Introducing oneself (name, work, place, etc.)',
+          'Module 1.2 Greeting and salutations in Indian Sign Language',
+          'Module 1.3 Some polite useful phrases.',
+          'Guideline',
+        ],
+        correctAnswer: 'Module 2.2 Introducing oneself (name, work, place, etc.)',
+        explanation: 'This is the title returned by the checked ISLRTC playlist and video metadata.',
+      },
+      {
+        prompt: 'Which organization is identified as the publisher of the linked resource?',
+        options: [
+          'Indian Sign Language Research and Training Centre',
+          'SignBridge AI',
+          'National Association of the Deaf',
+          'A university language department',
+        ],
+        correctAnswer: 'Indian Sign Language Research and Training Centre',
+        explanation: 'The video metadata names ISLRTC as the publisher.',
+      },
+      {
+        prompt: 'What can be concluded from the video title alone about the signs for name, work, or place?',
+        options: [
+          'The exact sign forms have not been independently verified by SignBridge',
+          'All three signs are identical across every ISL community',
+          'The title provides a complete signed-language grammar',
+          'The title certifies a learner’s ability to introduce themselves',
+        ],
+        correctAnswer: 'The exact sign forms have not been independently verified by SignBridge',
+        explanation: 'The title identifies topics, not the detailed sign forms or their linguistic use.',
+      },
+    ],
+  },
+];
+
 async function seed() {
   const mongoUri = process.env.MONGODB_URI;
 
@@ -244,6 +427,14 @@ async function seed() {
         { upsert: true }
       );
       if (lesson.slug) {
+        await Lesson.updateOne(
+          { slug: lesson.slug, keyTakeaways: { $exists: false } },
+          { $set: { keyTakeaways: lesson.keyTakeaways || [] } }
+        );
+        await Lesson.updateOne(
+          { slug: lesson.slug, completionChecklist: { $exists: false } },
+          { $set: { completionChecklist: lesson.completionChecklist || [] } }
+        );
         seededLessons.set(lesson.slug, await Lesson.findOne({ slug: lesson.slug }).select('_id'));
       }
     }
@@ -261,7 +452,20 @@ async function seed() {
       );
     }
 
-    console.log('ISLRTC lesson and quiz drafts are available (unpublished pending qualified review)');
+    for (const quiz of starterQuizzes) {
+      const lesson = seededLessons.get(quiz.lessonSlug);
+      if (!lesson) {
+        throw new Error(`Could not find seeded lesson for quiz ${quiz.slug}`);
+      }
+      const { lessonSlug, ...quizData } = quiz;
+      await Quiz.updateOne(
+        { slug: quiz.slug },
+        { $setOnInsert: { ...quizData, lesson: lesson._id } },
+        { upsert: true }
+      );
+    }
+
+    console.log('ISLRTC lesson metadata and starter resource-check quizzes are seeded; existing publication and review statuses are preserved');
   } catch (error) {
     console.error('Lesson seeding failed:', error.message);
     process.exitCode = 1;
@@ -276,4 +480,4 @@ if (require.main === module) {
   seed();
 }
 
-module.exports = { seed, lessons, quizzes };
+module.exports = { seed, lessons, quizzes, starterQuizzes };

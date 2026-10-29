@@ -23,6 +23,7 @@ const ids = {
   thirdQuestion: '64b000000000000000000033',
   fourthQuestion: '64b000000000000000000034',
   fifthQuestion: '64b000000000000000000035',
+  sixthQuestion: '64b000000000000000000043',
   secondQuiz: '64b000000000000000000011',
   secondLesson: '64b000000000000000000022',
 };
@@ -43,18 +44,68 @@ const courseQuiz = {
   title: 'Greetings check',
   lesson: ids.secondLesson,
   published: true,
+  assessmentFocus: 'isl-learning',
+  contentReviewStatus: 'reviewed',
+  passingScore: 70,
   questions: [
-    { _id: ids.thirdQuestion, prompt: 'Question three', options: ['Correct', 'Incorrect'], correctAnswer: 'Correct' },
+    { _id: ids.thirdQuestion, prompt: 'Choose the first option', options: ['Correct', 'Incorrect'], correctAnswer: 'Correct' },
     { _id: ids.fourthQuestion, prompt: 'Question four', options: ['Correct', 'Incorrect'], correctAnswer: 'Correct' },
     { _id: ids.fifthQuestion, prompt: 'Question five', options: ['Correct', 'Incorrect'], correctAnswer: 'Correct' },
+    { _id: ids.sixthQuestion, prompt: 'Question six', options: ['Correct', 'Incorrect'], correctAnswer: 'Correct' },
   ],
 };
 
-const draftQuiz = {
+const metadataQuiz = {
+  _id: '64b000000000000000000013',
+  title: 'Published course source facts',
+  lesson: ids.secondLesson,
+  published: true,
+  assessmentFocus: 'course-metadata',
+  contentReviewStatus: 'reviewed',
+  passingScore: 70,
+  questions: [
+    { _id: '64b000000000000000000037', prompt: 'Metadata question one', options: ['A', 'B', 'C', 'D'], correctAnswer: 'A' },
+    { _id: '64b000000000000000000038', prompt: 'Metadata question two', options: ['A', 'B', 'C', 'D'], correctAnswer: 'A' },
+    { _id: '64b000000000000000000039', prompt: 'Metadata question three', options: ['A', 'B', 'C', 'D'], correctAnswer: 'A' },
+    { _id: '64b000000000000000000040', prompt: 'Metadata question four', options: ['A', 'B', 'C', 'D'], correctAnswer: 'A' },
+  ],
+};
+
+const metadataQuizFirstLesson = {
+  _id: '64b000000000000000000015',
+  title: 'Published introduction resource check',
+  lesson: ids.lesson,
+  published: true,
+  assessmentFocus: 'course-metadata',
+  contentReviewStatus: 'pending',
+  passingScore: 70,
+  questions: [
+    { _id: '64b000000000000000000044', prompt: 'Introduction resource one', options: ['A', 'B', 'C', 'D'], correctAnswer: 'A' },
+    { _id: '64b000000000000000000045', prompt: 'Introduction resource two', options: ['A', 'B', 'C', 'D'], correctAnswer: 'A' },
+    { _id: '64b000000000000000000046', prompt: 'Introduction resource three', options: ['A', 'B', 'C', 'D'], correctAnswer: 'A' },
+    { _id: '64b000000000000000000047', prompt: 'Introduction resource four', options: ['A', 'B', 'C', 'D'], correctAnswer: 'A' },
+  ],
+};
+
+const pendingLearningQuiz = {
+  _id: '64b000000000000000000014',
+  title: 'Learning content awaiting review',
+  lesson: ids.lesson,
+  published: true,
+  assessmentFocus: 'isl-learning',
+  contentReviewStatus: 'pending',
+  passingScore: 70,
+  questions: [
+    { _id: '64b000000000000000000041', prompt: 'Pending question one', options: ['A', 'B'], correctAnswer: 'A' },
+    { _id: '64b000000000000000000042', prompt: 'Pending question two', options: ['A', 'B'], correctAnswer: 'A' },
+  ],
+};
+
+const quizOnUnpublishedLesson = {
   _id: '64b000000000000000000012',
-  title: 'Unpublished draft quiz',
+  title: 'Quiz attached to unpublished lesson',
   lesson: '64b000000000000000000021',
-  published: false,
+  published: true,
   questions: [{
     _id: '64b000000000000000000036',
     prompt: 'Draft-only question',
@@ -67,11 +118,13 @@ const originalMethods = {
   userFindById: User.findById,
   quizFind: Quiz.find,
   quizFindOne: Quiz.findOne,
+  quizAttemptFind: QuizAttempt.find,
   quizAttemptCreate: QuizAttempt.create,
   lessonFind: Lesson.find,
   lessonFindOne: Lesson.findOne,
   lessonCountDocuments: Lesson.countDocuments,
   lessonCompletionFind: LessonCompletion.find,
+  lessonCompletionFindOne: LessonCompletion.findOne,
   lessonCompletionCreate: LessonCompletion.create,
   progressFindOne: Progress.findOne,
   progressFindOneAndUpdate: Progress.findOneAndUpdate,
@@ -81,8 +134,10 @@ const quiz = {
   _id: ids.quiz,
   title: 'Foundations check',
   lesson: ids.lesson,
-  passingScore: 50,
+  passingScore: 70,
   published: true,
+  assessmentFocus: 'isl-learning',
+  contentReviewStatus: 'reviewed',
   questions: [
     {
       _id: ids.firstQuestion,
@@ -126,6 +181,7 @@ const draftLesson = {
 };
 
 function query(value) {
+  let queryValue = value;
   return {
     lean() {
       return this;
@@ -134,10 +190,26 @@ function query(value) {
       return this;
     },
     sort() {
+      const sortFields = arguments[0];
+      if (Array.isArray(queryValue) && sortFields) {
+        const fields = Object.entries(sortFields);
+        queryValue = [...queryValue].sort((left, right) => {
+          for (const [field, direction] of fields) {
+            const leftValue = left[field] == null ? 0 : new Date(left[field]).getTime();
+            const rightValue = right[field] == null ? 0 : new Date(right[field]).getTime();
+            if (leftValue !== rightValue) return (leftValue - rightValue) * direction;
+          }
+          return 0;
+        });
+      }
+      return this;
+    },
+    limit(count) {
+      if (Array.isArray(queryValue)) queryValue = queryValue.slice(0, count);
       return this;
     },
     then(resolve, reject) {
-      return Promise.resolve(value).then(resolve, reject);
+      return Promise.resolve(queryValue).then(resolve, reject);
     },
   };
 }
@@ -160,8 +232,9 @@ test('QuizAttempt schema accepts a full-course result without a single quiz refe
       score: 100,
     }],
     score: 100,
+    passingScore: null,
     total: 2,
-    passed: true,
+    passed: null,
     answers: [{
       questionId: ids.firstQuestion,
       selectedAnswer: 'Correct',
@@ -173,11 +246,13 @@ test('QuizAttempt schema accepts a full-course result without a single quiz refe
 
   await assert.doesNotReject(() => attempt.validate());
   assert.equal(attempt.mode, 'full-course');
+  assert.equal(attempt.passed, null);
 });
 
 let server;
 let apiUrl;
 let limitedCoursePool = false;
+let metadataOnlyCoursePool = false;
 
 before(async () => {
   const completions = new Map();
@@ -185,18 +260,36 @@ before(async () => {
   const attempts = [];
 
   User.findById = async (userId) => ({ _id: String(userId) });
-  Quiz.find = (filter) => query(
-    filter.published === true
-      ? (limitedCoursePool ? [quiz] : [quiz, courseQuiz]).filter(item => filter.lesson?.$in
+  Quiz.find = (filter) => {
+    const allQuizzes = [quiz, courseQuiz, metadataQuiz, metadataQuizFirstLesson, pendingLearningQuiz, quizOnUnpublishedLesson];
+    const publishedQuizzes = metadataOnlyCoursePool
+      ? [metadataQuiz, metadataQuizFirstLesson, quizOnUnpublishedLesson]
+      : limitedCoursePool
+        ? [quiz]
+        : allQuizzes.filter(item => item !== quizOnUnpublishedLesson);
+    return query((filter.published === true ? publishedQuizzes : allQuizzes)
+      .filter(item => filter.lesson?.$in
         ? filter.lesson.$in.map(String).includes(String(item.lesson))
         : true)
-      : [quiz, courseQuiz, draftQuiz],
-  );
-  Quiz.findOne = (filter) => query(String(filter._id) === ids.quiz ? quiz : null);
-  QuizAttempt.create = async (attempt) => {
-    attempts.push(attempt);
-    return { _id: '64b000000000000000000099', ...attempt };
+      .filter(item => filter._id?.$in
+        ? filter._id.$in.map(String).includes(String(item._id))
+        : true));
   };
+  Quiz.findOne = (filter) => query(
+    [quiz, courseQuiz, metadataQuiz, metadataQuizFirstLesson].find(item => String(item._id) === String(filter._id)) || null,
+  );
+  QuizAttempt.create = async (attempt) => {
+    const savedAttempt = {
+      _id: `64b0000000000000000000${String(attempts.length + 100).slice(-2)}`,
+      createdAt: new Date(),
+      ...attempt,
+    };
+    attempts.push(savedAttempt);
+    return savedAttempt;
+  };
+  QuizAttempt.find = ({ user }) => query(
+    attempts.filter(attempt => String(attempt.user) === String(user)),
+  );
   Lesson.find = ({ published }) => query(
     published === true
       ? [publishedLesson, secondPublishedLesson]
@@ -219,6 +312,10 @@ before(async () => {
       lean() { return Promise.resolve(records); },
     };
   };
+  LessonCompletion.findOne = ({ user, lesson }) => query(
+    (completions.get(String(user)) || [])
+      .find(record => String(record.lesson._id) === String(lesson)) || null,
+  );
   LessonCompletion.create = async ({ user, lesson }) => {
     const userId = String(user);
     const records = completions.get(userId) || [];
@@ -237,11 +334,22 @@ before(async () => {
     const userId = String(user);
     const previous = progressByUser.get(userId) || { achievements: [] };
     const next = { ...previous, ...update.$set };
-    if (update.$addToSet?.achievements) {
-      next.achievements = [...new Set([
-        ...previous.achievements,
-        update.$addToSet.achievements,
-      ])];
+    for (const [field, value] of Object.entries(update.$addToSet || {})) {
+      const current = next[field] || [];
+      next[field] = current.some(entry => String(entry) === String(value))
+        ? current
+        : [...current, value];
+    }
+    for (const [field, value] of Object.entries(update.$pull || {})) {
+      next[field] = (next[field] || []).filter(entry => String(entry) !== String(value));
+    }
+    for (const [field, value] of Object.entries(update.$push || {})) {
+      const addition = value.$each || [value];
+      next[field] = [...(next[field] || []), ...addition];
+      if (value.$sort?.occurredAt) {
+        next[field].sort((left, right) => new Date(right.occurredAt) - new Date(left.occurredAt));
+      }
+      if (Number.isInteger(value.$slice)) next[field] = next[field].slice(0, value.$slice);
     }
     progressByUser.set(userId, next);
     return next;
@@ -250,7 +358,7 @@ before(async () => {
   server = app.listen(0, '127.0.0.1');
   await new Promise((resolve) => server.once('listening', resolve));
   apiUrl = `http://127.0.0.1:${server.address().port}/api`;
-  server.testState = { attempts, completions };
+  server.testState = { attempts, completions, progressByUser };
 });
 
 after(async () => {
@@ -264,11 +372,13 @@ after(async () => {
   User.findById = originalMethods.userFindById;
   Quiz.find = originalMethods.quizFind;
   Quiz.findOne = originalMethods.quizFindOne;
+  QuizAttempt.find = originalMethods.quizAttemptFind;
   QuizAttempt.create = originalMethods.quizAttemptCreate;
   Lesson.find = originalMethods.lessonFind;
   Lesson.findOne = originalMethods.lessonFindOne;
   Lesson.countDocuments = originalMethods.lessonCountDocuments;
   LessonCompletion.find = originalMethods.lessonCompletionFind;
+  LessonCompletion.findOne = originalMethods.lessonCompletionFindOne;
   LessonCompletion.create = originalMethods.lessonCompletionCreate;
   Progress.findOne = originalMethods.progressFindOne;
   Progress.findOneAndUpdate = originalMethods.progressFindOneAndUpdate;
@@ -296,7 +406,7 @@ test('lesson catalog returns published records and keeps drafts hidden from lear
 
 test('full-course assessment mixes published questions and saves a graded attempt', async () => {
   const headers = {
-    Authorization: `Bearer ${tokenFor(ids.user)}`,
+    Authorization: `Bearer ${tokenFor(ids.otherUser)}`,
     'Content-Type': 'application/json',
   };
   const overviewResponse = await fetch(`${apiUrl}/quizzes/full-course`, { headers });
@@ -306,6 +416,8 @@ test('full-course assessment mixes published questions and saves a graded attemp
   assert.equal(overview.data.questionCount, 5);
   assert.equal(overview.data.lessonCount, 2);
   assert.equal(overview.data.passingScore, 70);
+  assert.equal(overview.data.excludedMetadataQuestionCount, 8);
+  assert.equal(overview.data.excludedReviewPendingQuestionCount, 2);
   assert.equal('timeLimit' in overview.data, false);
   assert.equal('attemptLimit' in overview.data, false);
 
@@ -315,8 +427,17 @@ test('full-course assessment mixes published questions and saves a graded attemp
   );
   assert.equal(lessonQuizListResponse.status, 200);
   const lessonQuizList = await lessonQuizListResponse.json();
-  assert.equal(lessonQuizList.data.length, 1);
+  assert.equal(lessonQuizList.data.length, 3);
   assert.equal(lessonQuizList.data[0]._id, ids.quiz);
+  assert.equal(
+    lessonQuizList.data.some(item => item._id === pendingLearningQuiz._id),
+    true,
+  );
+  assert.equal(
+    lessonQuizList.data.some(item => item._id === metadataQuizFirstLesson._id),
+    true,
+  );
+  assert.equal(lessonQuizList.data.some(item => item._id === quizOnUnpublishedLesson._id), false);
 
   const unpublishedLessonQuizListResponse = await fetch(
     `${apiUrl}/quizzes?lessonId=${draftLesson._id}`,
@@ -324,7 +445,7 @@ test('full-course assessment mixes published questions and saves a graded attemp
   );
   assert.equal(unpublishedLessonQuizListResponse.status, 404);
   const draftQuizResponse = await fetch(
-    `${apiUrl}/quizzes/${draftQuiz._id}`,
+    `${apiUrl}/quizzes/${quizOnUnpublishedLesson._id}`,
     { headers },
   );
   assert.equal(draftQuizResponse.status, 404);
@@ -334,6 +455,7 @@ test('full-course assessment mixes published questions and saves a graded attemp
   const test = await questionsResponse.json();
   assert.equal(test.data.questions.length, 5);
   assert.equal(new Set(test.data.questions.map(question => String(question.lessonId))).size, 2);
+  assert.equal(new Set(test.data.questions.map(question => question.prompt.trim().toLowerCase())).size, 5);
   assert.equal(test.data.questions.some(question => 'correctAnswer' in question), false);
   assert.equal(test.data.questions.some(question => question.prompt === 'Draft-only question'), false);
 
@@ -343,6 +465,36 @@ test('full-course assessment mixes published questions and saves a graded attemp
     body: JSON.stringify({ answers: [] }),
   });
   assert.equal(invalidAttempt.status, 400);
+  assert.equal(server.testState.attempts.length, 0);
+
+  const duplicateAnswerAttempt = await fetch(`${apiUrl}/quizzes/full-course/attempts`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      answers: test.data.questions.map(question => ({
+        questionId: question._id,
+        selectedAnswer: 'Correct',
+      })).map((answer, index, submitted) => (
+        index === submitted.length - 1
+          ? { ...answer, questionId: submitted[0].questionId }
+          : answer
+      )),
+    }),
+  });
+  assert.equal(duplicateAnswerAttempt.status, 400);
+  assert.equal(server.testState.attempts.length, 0);
+
+  const invalidOptionAttempt = await fetch(`${apiUrl}/quizzes/full-course/attempts`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      answers: test.data.questions.map((question, index) => ({
+        questionId: question._id,
+        selectedAnswer: index === 0 ? 'not an option' : 'Correct',
+      })),
+    }),
+  });
+  assert.equal(invalidOptionAttempt.status, 400);
   assert.equal(server.testState.attempts.length, 0);
 
   const attemptResponse = await fetch(`${apiUrl}/quizzes/full-course/attempts`, {
@@ -359,10 +511,92 @@ test('full-course assessment mixes published questions and saves a graded attemp
   const attemptResult = await attemptResponse.json();
   assert.equal(attemptResult.data.mode, 'full-course');
   assert.equal(attemptResult.data.score, 100);
+  assert.equal(attemptResult.data.percentage, 100);
+  assert.equal(attemptResult.data.total, 5);
   assert.equal(attemptResult.data.passed, true);
+  assert.equal(attemptResult.data.passingScore, 70);
   assert.equal(attemptResult.data.lessonBreakdown.length, 2);
   assert.equal(server.testState.attempts[0].mode, 'full-course');
   assert.equal(server.testState.attempts[0].quiz, null);
+  assert.equal(server.testState.attempts[0].score, 100);
+  assert.equal(server.testState.attempts[0].total, 5);
+});
+
+test('full-course attempt omits pass status when eligible quizzes have different thresholds', async () => {
+  const originalPassingScore = courseQuiz.passingScore;
+  courseQuiz.passingScore = 80;
+  try {
+    const headers = {
+      Authorization: `Bearer ${tokenFor(ids.user)}`,
+      'Content-Type': 'application/json',
+    };
+    const overviewResponse = await fetch(`${apiUrl}/quizzes/full-course`, { headers });
+    const overview = await overviewResponse.json();
+    assert.equal(overview.data.available, true);
+    assert.equal('passingScore' in overview.data, false);
+
+    const questionsResponse = await fetch(`${apiUrl}/quizzes/full-course/questions`, { headers });
+    const test = await questionsResponse.json();
+    const attemptResponse = await fetch(`${apiUrl}/quizzes/full-course/attempts`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        answers: test.data.questions.map(question => ({
+          questionId: question._id,
+          selectedAnswer: 'Correct',
+        })),
+      }),
+    });
+    assert.equal(attemptResponse.status, 201);
+    const attemptResult = await attemptResponse.json();
+    assert.equal(attemptResult.data.score, 100);
+    assert.equal('passed' in attemptResult.data, false);
+    assert.equal('passingScore' in attemptResult.data, false);
+    assert.equal(server.testState.attempts.at(-1).passingScore, null);
+    assert.equal(server.testState.attempts.at(-1).passed, null);
+  } finally {
+    courseQuiz.passingScore = originalPassingScore;
+  }
+});
+
+test('published course-resource quiz loads without answer keys and persists its graded result', async () => {
+  const headers = {
+    Authorization: `Bearer ${tokenFor(ids.user)}`,
+    'Content-Type': 'application/json',
+  };
+  const listResponse = await fetch(
+    `${apiUrl}/quizzes?lessonId=${ids.secondLesson}`,
+    { headers },
+  );
+  assert.equal(listResponse.status, 200);
+  const list = await listResponse.json();
+  assert.ok(list.data.some(item => item._id === metadataQuiz._id));
+
+  const quizResponse = await fetch(`${apiUrl}/quizzes/${metadataQuiz._id}`, { headers });
+  assert.equal(quizResponse.status, 200);
+  const loadedQuiz = await quizResponse.json();
+  assert.equal(loadedQuiz.data.assessmentFocus, 'course-metadata');
+  assert.equal(loadedQuiz.data.questions.length, 4);
+  assert.equal(loadedQuiz.data.questions.every(question => question.options.length === 4), true);
+  assert.equal(loadedQuiz.data.questions.some(question => 'correctAnswer' in question), false);
+
+  const attemptResponse = await fetch(`${apiUrl}/quizzes/${metadataQuiz._id}/attempts`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      answers: metadataQuiz.questions.map(question => ({
+        questionId: question._id,
+        selectedAnswer: question.correctAnswer,
+      })),
+    }),
+  });
+  assert.equal(attemptResponse.status, 201);
+  const result = await attemptResponse.json();
+  assert.equal(result.data.score, 100);
+  assert.equal(result.data.total, 4);
+  assert.equal(result.data.answers.length, 4);
+  assert.equal(server.testState.attempts.at(-1).quiz, metadataQuiz._id);
+  assert.equal(server.testState.attempts.at(-1).user, ids.user);
 });
 
 test('full-course overview explains when its published question pool is too small', async () => {
@@ -376,10 +610,61 @@ test('full-course overview explains when its published question pool is too smal
     assert.equal(overview.data.available, false);
     assert.equal(overview.data.questionCount, 2);
     assert.equal(overview.data.lessonCount, 1);
-    assert.match(overview.data.reason, /at least 5 published questions/);
-    assert.match(overview.data.reason, /at least 2 lessons/);
+    assert.match(overview.data.reason, /at least 5 qualified-review ISL learning questions/);
+    assert.match(overview.data.reason, /at least 2 published lessons/);
   } finally {
     limitedCoursePool = false;
+  }
+});
+
+test('full-course falls back to a multi-lesson resource check without implying ISL proficiency', async () => {
+  metadataOnlyCoursePool = true;
+  try {
+    const headers = {
+      Authorization: `Bearer ${tokenFor(ids.user)}`,
+      'Content-Type': 'application/json',
+    };
+    const overviewResponse = await fetch(`${apiUrl}/quizzes/full-course`, { headers });
+    assert.equal(overviewResponse.status, 200);
+    const overview = await overviewResponse.json();
+    assert.equal(overview.data.available, true);
+    assert.equal(overview.data.title, 'Full-course resource check');
+    assert.equal(overview.data.assessmentFocus, 'course-metadata');
+    assert.equal(overview.data.questionCount, 8);
+    assert.equal(overview.data.lessonCount, 2);
+    assert.equal(overview.data.learningAssessmentAvailable, false);
+    assert.match(overview.data.scope, /not an ISL proficiency assessment/);
+    assert.equal('passingScore' in overview.data, false);
+
+    const questionResponse = await fetch(`${apiUrl}/quizzes/full-course/questions`, { headers });
+    assert.equal(questionResponse.status, 200);
+    const questionData = await questionResponse.json();
+    assert.equal(questionData.data.assessmentFocus, 'course-metadata');
+    assert.equal(questionData.data.questions.length, 8);
+    assert.equal(new Set(questionData.data.questions.map(item => String(item.lessonId))).size, 2);
+    assert.equal(questionData.data.questions.some(item => 'correctAnswer' in item), false);
+    assert.equal(questionData.data.questions.some(item => item.prompt === 'Draft-only question'), false);
+
+    const attemptResponse = await fetch(`${apiUrl}/quizzes/full-course/attempts`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        answers: questionData.data.questions.map(question => ({
+          questionId: question._id,
+          selectedAnswer: 'A',
+        })),
+      }),
+    });
+    assert.equal(attemptResponse.status, 201);
+    const attemptResult = await attemptResponse.json();
+    assert.equal(attemptResult.data.assessmentFocus, 'course-metadata');
+    assert.equal(attemptResult.data.score, 100);
+    assert.equal('passed' in attemptResult.data, false);
+    assert.equal(server.testState.attempts.at(-1).assessmentFocus, 'course-metadata');
+    assert.equal(server.testState.attempts.at(-1).passed, null);
+    assert.equal(server.testState.attempts.at(-1).passingScore, null);
+  } finally {
+    metadataOnlyCoursePool = false;
   }
 });
 
@@ -393,6 +678,12 @@ test('auth protects quiz submission, withholds answers, and tracks unique user c
   assert.equal(unauthenticated.status, 401);
   const unauthenticatedCourseOverview = await fetch(`${apiUrl}/quizzes/full-course`);
   assert.equal(unauthenticatedCourseOverview.status, 401);
+  const unauthenticatedCourseAttempt = await fetch(`${apiUrl}/quizzes/full-course/attempts`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ answers: [] }),
+  });
+  assert.equal(unauthenticatedCourseAttempt.status, 401);
 
   const authHeaders = {
     Authorization: `Bearer ${tokenFor(ids.user)}`,
@@ -452,7 +743,7 @@ test('auth protects quiz submission, withholds answers, and tracks unique user c
   assert.equal(firstCompletion.status, 201);
   const firstProgress = await firstCompletion.json();
   assert.equal(firstProgress.progress.completedLessons, 1);
-  assert.equal(firstProgress.progress.percentage, 100);
+  assert.equal(firstProgress.progress.percentage, 50);
 
   const duplicateCompletion = await completionRequest();
   assert.equal(duplicateCompletion.status, 200);
@@ -466,4 +757,89 @@ test('auth protects quiz submission, withholds answers, and tracks unique user c
   });
   const otherUserData = await otherUserProgress.json();
   assert.equal(otherUserData.progress.completedLessons, 0);
+});
+
+test('lesson access persists per-user progress without conflating quiz attempts and completion', async () => {
+  const unauthenticated = await fetch(`${apiUrl}/progress/access-lesson`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ lessonId: ids.lesson }),
+  });
+  assert.equal(unauthenticated.status, 401);
+
+  const headers = {
+    Authorization: `Bearer ${tokenFor(ids.otherUser)}`,
+    'Content-Type': 'application/json',
+  };
+  const primaryUserProgressBefore = server.testState.progressByUser.get(ids.user);
+  const invalid = await fetch(`${apiUrl}/progress/access-lesson`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ lessonId: 'invalid' }),
+  });
+  assert.equal(invalid.status, 400);
+
+  const unpublished = await fetch(`${apiUrl}/progress/access-lesson`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ lessonId: draftLesson._id }),
+  });
+  assert.equal(unpublished.status, 404);
+
+  const access = async (lessonId) => fetch(`${apiUrl}/progress/access-lesson`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ lessonId }),
+  });
+  const firstAccess = await access(ids.lesson);
+  assert.equal(firstAccess.status, 200);
+  const firstSnapshot = await firstAccess.json();
+  assert.equal(firstSnapshot.progress.inProgressCount, 1);
+  assert.equal(firstSnapshot.progress.completedLessons, 0);
+  assert.equal(String(firstSnapshot.progress.lastAccessedLesson._id), ids.lesson);
+  assert.equal(firstSnapshot.progress.recentActivity[0].activity, 'started');
+
+  const repeatAccess = await access(ids.lesson);
+  assert.equal(repeatAccess.status, 200);
+  const repeatSnapshot = await repeatAccess.json();
+  assert.equal(repeatSnapshot.progress.inProgressCount, 1);
+  assert.equal(repeatSnapshot.progress.recentActivity[0].activity, 'resumed');
+  assert.equal(server.testState.progressByUser.get(ids.otherUser).inProgressLessons.length, 1);
+  assert.equal(server.testState.progressByUser.get(ids.user), primaryUserProgressBefore);
+
+  const quizAttempt = await fetch(`${apiUrl}/quizzes/${ids.quiz}/attempts`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      answers: [
+        { questionId: ids.firstQuestion, selectedAnswer: 'Correct' },
+        { questionId: ids.secondQuestion, selectedAnswer: 'Incorrect' },
+      ],
+    }),
+  });
+  assert.equal(quizAttempt.status, 201);
+  const savedQuizResult = await quizAttempt.json();
+  assert.equal(savedQuizResult.data.score, 50);
+  const afterQuiz = await fetch(`${apiUrl}/progress`, { headers });
+  const afterQuizData = await afterQuiz.json();
+  assert.equal(afterQuizData.progress.completedLessons, 0);
+  assert.equal(afterQuizData.progress.inProgressCount, 1);
+  assert.equal(afterQuizData.progress.latestQuizResults[0].score, 50);
+  assert.equal(afterQuizData.progress.latestQuizResults[0].total, 2);
+
+  const completion = await fetch(`${apiUrl}/progress/complete-lesson`, {
+    method: 'PATCH',
+    headers,
+    body: JSON.stringify({ lessonId: ids.lesson }),
+  });
+  assert.equal(completion.status, 201);
+  const completedSnapshot = await completion.json();
+  assert.equal(completedSnapshot.progress.completedLessons, 1);
+  assert.equal(completedSnapshot.progress.inProgressCount, 0);
+
+  const revisitCompleted = await access(ids.lesson);
+  assert.equal(revisitCompleted.status, 200);
+  const revisitData = await revisitCompleted.json();
+  assert.equal(revisitData.progress.completedLessons, 1);
+  assert.equal(revisitData.progress.inProgressCount, 0);
 });

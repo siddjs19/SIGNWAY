@@ -22,6 +22,11 @@ const quizSchema = new mongoose.Schema(
     },
     title: { type: String, required: true },
     questions: [questionSchema],
+    assessmentFocus: {
+      type: String,
+      enum: ['isl-learning', 'course-metadata'],
+      default: 'course-metadata',
+    },
     passingScore: { type: Number, default: 70 },
     contentReviewStatus: {
       type: String,
