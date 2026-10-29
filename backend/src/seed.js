@@ -63,10 +63,17 @@ const lessons = [
       'Recall the module, topic, and duration details stated in the playlist description.',
       'Distinguish verified source information from sign content awaiting qualified review.',
     ],
+    practiceActivities: [
+      'After watching the Guideline resource, write down the course facts stated in its publisher description.',
+      'Compare the lesson title and resource title; do not infer sign forms from metadata.',
+    ],
     contentReviewStatus: 'pending',
     contentReviewNote: 'SignBridge-authored explanations and quiz questions require review by a qualified ISL educator. The external video title and publisher were verified; no individual sign claim is made.',
     level: 'beginner',
     category: 'Foundations',
+    moduleTitle: 'Course orientation',
+    moduleOrder: 1,
+    prerequisites: [],
     order: 1,
     published: false,
     signs: [],
@@ -94,10 +101,17 @@ const lessons = [
       'Identify which resource title covers greetings and which names polite useful phrases.',
       'Treat the video as the source for its demonstrations; SignBridge has not independently reviewed individual signs.',
     ],
+    practiceActivities: [
+      'Watch each linked ISLRTC resource and record the topic named in its title.',
+      'Use the official videos as the source for demonstrations; SignBridge does not validate learner signing.',
+    ],
     contentReviewStatus: 'pending',
     contentReviewNote: 'Only video titles, publisher metadata, availability, and embeddability were checked. Sign content and SignBridge-authored quiz require qualified ISL review.',
     level: 'beginner',
     category: 'Basic Communication',
+    moduleTitle: 'Module 1: Greetings and polite phrases',
+    moduleOrder: 2,
+    prerequisites: [],
     order: 2,
     published: false,
     signs: [],
@@ -130,10 +144,17 @@ const lessons = [
       'Recall the topics named in its verified title: name, work, and place.',
       'Do not treat the title or SignBridge-authored notes as independent verification of signs.',
     ],
+    practiceActivities: [
+      'Watch the linked Module 2.2 video and note the topics named in its title.',
+      'Review the source material; do not treat self-assessment as validation of sign accuracy.',
+    ],
     contentReviewStatus: 'pending',
     contentReviewNote: 'The video title, publisher metadata, availability, and embeddability were verified. Visual instruction and SignBridge-authored quiz require qualified ISL review.',
     level: 'beginner',
     category: 'Basic Communication',
+    moduleTitle: 'Module 2: Introducing oneself',
+    moduleOrder: 3,
+    prerequisites: [],
     order: 3,
     published: false,
     signs: [],
@@ -435,6 +456,12 @@ async function seed() {
           { slug: lesson.slug, completionChecklist: { $exists: false } },
           { $set: { completionChecklist: lesson.completionChecklist || [] } }
         );
+        for (const field of ['moduleTitle', 'moduleOrder', 'practiceActivities', 'prerequisites']) {
+          await Lesson.updateOne(
+            { slug: lesson.slug, [field]: { $exists: false } },
+            { $set: { [field]: lesson[field] ?? (field === 'prerequisites' ? [] : '') } }
+          );
+        }
         seededLessons.set(lesson.slug, await Lesson.findOne({ slug: lesson.slug }).select('_id'));
       }
     }

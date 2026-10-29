@@ -57,6 +57,8 @@ async function getCourseAssessment(assessmentFocus = 'isl-learning') {
 
     const lessonQuestions = questionsByLesson.get(String(lesson._id)) || [];
     for (const question of quiz.questions || []) {
+      const questionReviewStatus = question.contentReviewStatus || quiz.contentReviewStatus || 'pending';
+      if (assessmentFocus === 'isl-learning' && questionReviewStatus !== 'reviewed') continue;
       const normalizedPrompt = question.prompt.trim().replace(/\s+/g, ' ').toLocaleLowerCase();
       if (!normalizedPrompt || seenPrompts.has(normalizedPrompt)) continue;
       seenPrompts.add(normalizedPrompt);
@@ -67,6 +69,11 @@ async function getCourseAssessment(assessmentFocus = 'isl-learning') {
         lessonTitle: lesson.title,
         prompt: question.prompt,
         mediaUrl: question.mediaUrl || '',
+        mediaType: question.mediaType || (question.questionType === 'video-based' ? 'video' : 'image'),
+        questionType: question.questionType || 'single-choice',
+        difficulty: question.difficulty || 'beginner',
+        topic: question.topic || '',
+        contentReviewStatus: questionReviewStatus,
         options: question.options,
         correctAnswer: question.correctAnswer,
         explanation: question.explanation || '',
@@ -158,8 +165,31 @@ function questionForLearner(question) {
     lessonTitle: question.lessonTitle,
     prompt: question.prompt,
     mediaUrl: question.mediaUrl,
+    mediaType: question.mediaType || (question.questionType === 'video-based' ? 'video' : 'image'),
+    questionType: question.questionType || 'single-choice',
+    difficulty: question.difficulty || 'beginner',
+    topic: question.topic || '',
+    contentReviewStatus: question.contentReviewStatus || 'pending',
     options: question.options,
   };
+}
+
+function validSelectedAnswer(question, selectedAnswer) {
+  if (question.questionType === 'multiple-choice') {
+    return Array.isArray(selectedAnswer)
+      && selectedAnswer.length > 0
+      && new Set(selectedAnswer).size === selectedAnswer.length
+      && selectedAnswer.every(option => question.options.includes(option));
+  }
+  return typeof selectedAnswer === 'string'
+    && question.options.includes(selectedAnswer);
+}
+
+function answersMatch(selected, correct) {
+  if (!Array.isArray(correct)) return selected === correct;
+  return Array.isArray(selected)
+    && selected.length === correct.length
+    && selected.every(answer => correct.includes(answer));
 }
 
 function validateSubmittedAnswers(questions, submitted) {
@@ -178,26 +208,35 @@ function validateSubmittedAnswers(questions, submitted) {
 
   if (submitted.some(answer => {
     const question = questions.find(item => String(item._id) === String(answer.questionId));
-    return typeof answer.selectedAnswer !== 'string'
-      || !question.options.includes(answer.selectedAnswer);
+    return !validSelectedAnswer(question, answer.selectedAnswer);
   })) {
-    return 'Each answer must select one of the question options';
+    return 'Each answer must select valid option(s) for its question type';
   }
 
   return null;
 }
 
-function gradeAnswers(questions, submitted) {
+function gradeAnswers(questions, submitted, context = {}) {
   return questions.map(question => {
     const response = submitted.find(
       answer => String(answer.questionId) === String(question._id),
     );
     return {
       questionId: question._id,
+      quizId: context.quizId || question.quizId,
+      lessonId: context.lessonId || question.lessonId,
+      lessonTitle: context.lessonTitle || question.lessonTitle,
+      topic: question.topic || '',
+      questionType: question.questionType || 'single-choice',
+      contentReviewStatus: question.contentReviewStatus || 'pending',
       selectedAnswer: response.selectedAnswer,
-      isCorrect: response.selectedAnswer === question.correctAnswer,
+      isCorrect: answersMatch(response.selectedAnswer, question.correctAnswer),
       correctAnswer: question.correctAnswer,
-      explanation: question.explanation || '',
+      explanation: context.assessmentFocus === 'course-metadata'
+        || (context.contentReviewStatus === 'reviewed'
+          && question.contentReviewStatus === 'reviewed')
+        ? question.explanation || ''
+        : '',
     };
   });
 }
@@ -246,6 +285,8 @@ router.get('/', async (req, res) => {
           questionCount: quiz.questions.length,
           contentReviewStatus: quiz.contentReviewStatus,
           assessmentFocus: quiz.assessmentFocus || 'course-metadata',
+          questionTypes: [...new Set(quiz.questions.map(question => question.questionType || 'single-choice'))],
+          reviewedQuestionCount: quiz.questions.filter(question => question.contentReviewStatus === 'reviewed').length,
         })),
     });
   } catch (error) {
@@ -331,7 +372,10 @@ router.post('/full-course/attempts', async (req, res) => {
       return res.status(400).json({ success: false, message: validationError });
     }
 
-    const answers = gradeAnswers(assessment.questions, req.body.answers);
+    const answers = gradeAnswers(assessment.questions, req.body.answers, {
+      assessmentFocus: assessment.assessmentFocus,
+      contentReviewStatus: 'reviewed',
+    });
     const total = answers.length;
     const correct = answers.filter(answer => answer.isCorrect).length;
     const score = Math.round((correct / total) * 100);
@@ -424,12 +468,7 @@ router.get('/:id', async (req, res) => {
         passingScore: quiz.passingScore,
         contentReviewStatus: quiz.contentReviewStatus,
         assessmentFocus: quiz.assessmentFocus || 'course-metadata',
-        questions: quiz.questions.map(question => ({
-          _id: question._id,
-          prompt: question.prompt,
-          mediaUrl: question.mediaUrl,
-          options: question.options,
-        })),
+        questions: quiz.questions.map(questionForLearner),
       },
     });
   } catch (error) {
@@ -455,7 +494,7 @@ router.post('/:id/attempts', async (req, res) => {
     const lesson = await Lesson.findOne({
       _id: quiz.lesson,
       published: true,
-    }).select('_id');
+    }).select('_id title');
     if (!lesson) {
       return res.status(404).json({ message: 'Quiz not found' });
     }
@@ -465,7 +504,13 @@ router.post('/:id/attempts', async (req, res) => {
       return res.status(400).json({ message: validationError });
     }
 
-    const answers = gradeAnswers(quiz.questions, req.body.answers);
+    const answers = gradeAnswers(quiz.questions, req.body.answers, {
+      quizId: quiz._id,
+      lessonId: lesson._id,
+      lessonTitle: lesson.title,
+      assessmentFocus: quiz.assessmentFocus || 'course-metadata',
+      contentReviewStatus: quiz.contentReviewStatus,
+    });
     const total = quiz.questions.length;
     const correct = answers.filter(answer => answer.isCorrect).length;
     const score = Math.round((correct / total) * 100);

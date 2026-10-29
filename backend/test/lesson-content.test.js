@@ -20,6 +20,10 @@ test('ISLRTC lesson drafts store verified video metadata and remain unpublished'
     assert.ok(lesson, `missing lesson ${slug}`);
     assert.equal(lesson.published, false);
     assert.equal(lesson.contentReviewStatus, 'pending');
+    assert.ok(lesson.moduleTitle);
+    assert.ok(lesson.moduleOrder > 0);
+    assert.ok(Array.isArray(lesson.prerequisites));
+    assert.ok(lesson.practiceActivities.length > 0);
     assert.equal(lesson.resources.length, videoIds.length);
     assert.deepEqual(lesson.resources.map(resource => resource.videoId), videoIds);
     await assert.doesNotReject(() => new Lesson(lesson).validate());
@@ -39,6 +43,46 @@ test('ISLRTC lesson drafts store verified video metadata and remain unpublished'
       assert.ok(resource.metadataVerifiedAt instanceof Date);
     }
   }
+});
+
+test('quiz schema validates multiple-choice and video-based question formats', async () => {
+  const lessonId = '64b000000000000000000020';
+  const validQuiz = new Quiz({
+    lesson: lessonId,
+    title: 'Question format schema test',
+    questions: [
+      {
+        prompt: 'Select all correct options',
+        questionType: 'multiple-choice',
+        difficulty: 'intermediate',
+        topic: 'sample topic',
+        contentReviewStatus: 'pending',
+        options: ['A', 'B', 'C'],
+        correctAnswer: ['A', 'C'],
+      },
+      {
+        prompt: 'Watch the clip',
+        questionType: 'video-based',
+        mediaType: 'video',
+        mediaUrl: 'https://media.example.test/clip.mp4',
+        options: ['A', 'B'],
+        correctAnswer: 'A',
+      },
+    ],
+  });
+  await assert.doesNotReject(() => validQuiz.validate());
+
+  const invalidMultiAnswer = new Quiz({
+    lesson: lessonId,
+    title: 'Invalid multiple-choice answer shape',
+    questions: [{
+      prompt: 'Select all correct options',
+      questionType: 'multiple-choice',
+      options: ['A', 'B'],
+      correctAnswer: 'A',
+    }],
+  });
+  await assert.rejects(() => invalidMultiAnswer.validate());
 });
 
 test('draft lesson quizzes only grade options and remain unpublished pending review', async () => {

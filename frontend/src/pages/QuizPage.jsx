@@ -409,31 +409,64 @@ export default function QuizPage({ user, onLogout }) {
         >
           <div className="h-full rounded-full bg-sb-signal transition-all" style={{ width: `${progressPercent}%` }} />
         </div>
-        {currentQuestionData.mediaUrl && (
+        {currentQuestionData.mediaUrl && currentQuestionData.mediaType === 'video' && (
+          <video
+            className="max-h-96 w-full rounded-xl bg-[#040d16]"
+            controls
+            preload="metadata"
+            src={currentQuestionData.mediaUrl}
+          >
+            Your browser does not support embedded video.
+          </video>
+        )}
+        {currentQuestionData.mediaUrl && currentQuestionData.mediaType !== 'video' && (
           <img className="max-h-80 max-w-full rounded-xl object-contain" src={currentQuestionData.mediaUrl} alt="Question reference" />
         )}
         <fieldset className="space-y-3">
-          <legend className="sr-only">Choose one answer</legend>
-          {currentQuestionData.options.map(option => (
+          <legend className="sr-only">
+            {currentQuestionData.questionType === 'multiple-choice' ? 'Choose all that apply' : 'Choose one answer'}
+          </legend>
+          {currentQuestionData.options.map(option => {
+            const multiple = currentQuestionData.questionType === 'multiple-choice';
+            const selection = answers[currentQuestionData._id];
+            const checked = multiple
+              ? Array.isArray(selection) && selection.includes(option)
+              : selection === option;
+            return (
             <label
               key={option}
               className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 text-sm transition focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-sb-signal ${
-                answers[currentQuestionData._id] === option
+                checked
                   ? 'border-sb-signal bg-[rgba(92,225,214,0.1)] text-sb-soft'
                   : 'border-[rgba(92,225,214,0.14)] text-sb-body hover:border-[rgba(92,225,214,0.4)]'
               }`}
             >
               <input
-                type="radio"
+                type={multiple ? 'checkbox' : 'radio'}
                 name={`question-${currentQuestionData._id}`}
                 value={option}
-                checked={answers[currentQuestionData._id] === option}
-                onChange={() => setAnswers(previous => ({ ...previous, [currentQuestionData._id]: option }))}
+                checked={checked}
+                onChange={() => setAnswers(previous => {
+                  if (!multiple) return { ...previous, [currentQuestionData._id]: option };
+                  const selected = Array.isArray(previous[currentQuestionData._id])
+                    ? previous[currentQuestionData._id]
+                    : [];
+                  const next = selected.includes(option)
+                    ? selected.filter(value => value !== option)
+                    : [...selected, option];
+                  if (next.length === 0) {
+                    const remaining = { ...previous };
+                    delete remaining[currentQuestionData._id];
+                    return remaining;
+                  }
+                  return { ...previous, [currentQuestionData._id]: next };
+                })}
                 className="mt-0.5 accent-[#5ce1d6]"
               />
               <span>{option}</span>
             </label>
-          ))}
+            );
+          })}
         </fieldset>
         <div className="flex flex-wrap justify-between gap-3">
           <button
@@ -476,7 +509,9 @@ export default function QuizPage({ user, onLogout }) {
               </p>
               <p className="mt-1 text-sm text-sb-soft">{question.prompt}</p>
               <p className="mt-1 text-sm text-sb-muted">
-                {answers[question._id] ? `Your answer: ${answers[question._id]}` : 'Not answered'}
+                {answers[question._id]
+                  ? `Your answer: ${Array.isArray(answers[question._id]) ? answers[question._id].join(', ') : answers[question._id]}`
+                  : 'Not answered'}
               </p>
             </div>
             <button
@@ -533,6 +568,12 @@ export default function QuizPage({ user, onLogout }) {
           {result.attemptId && <p className="mt-2 text-xs text-sb-muted">Attempt saved</p>}
         </section>
 
+        {isLessonQuiz && assessment.contentReviewStatus !== 'reviewed' && result.assessmentFocus !== 'course-metadata' && (
+          <p className="rounded-xl border border-amber-300/25 bg-amber-300/5 p-4 text-sm leading-relaxed text-amber-100">
+            This quiz is awaiting qualified review. Its score and stored answer key are not verified measures of ISL knowledge.
+          </p>
+        )}
+
         {result.lessonBreakdown?.length > 0 && (
           <section className={`${card} p-5`}>
             <h2 className="font-extrabold text-sb-soft">Performance by lesson</h2>
@@ -560,8 +601,22 @@ export default function QuizPage({ user, onLogout }) {
                   <div className="space-y-1">
                     <h3 className="font-bold text-sb-soft">{index + 1}. {question.prompt}</h3>
                     {isFullCourse && <p className="text-xs text-sb-muted">{question.lessonTitle}</p>}
-                    <p className="text-sm text-sb-body">Your answer: {answer?.selectedAnswer || 'No answer submitted'}</p>
-                    {!answer?.isCorrect && <p className="text-sm text-amber-100">Correct answer: {answer?.correctAnswer}</p>}
+                    <p className="text-sm text-sb-body">
+                      Your answer: {Array.isArray(answer?.selectedAnswer)
+                        ? answer.selectedAnswer.join(', ')
+                        : answer?.selectedAnswer || 'No answer submitted'}
+                    </p>
+                    {!answer?.isCorrect && (question.contentReviewStatus === 'reviewed' || result.assessmentFocus === 'course-metadata') && (
+                      <p className="text-sm text-amber-100">
+                        {result.assessmentFocus === 'course-metadata' ? 'Expected answer' : 'Correct answer'}:{' '}
+                        {Array.isArray(answer?.correctAnswer)
+                          ? answer.correctAnswer.join(', ')
+                          : answer?.correctAnswer}
+                      </p>
+                    )}
+                    {!answer?.isCorrect && question.contentReviewStatus !== 'reviewed' && result.assessmentFocus !== 'course-metadata' && (
+                      <p className="text-sm text-amber-100">Stored answer is awaiting qualified content review.</p>
+                    )}
                     {answer?.explanation && <p className="text-sm leading-relaxed text-sb-muted">{answer.explanation}</p>}
                   </div>
                 </div>

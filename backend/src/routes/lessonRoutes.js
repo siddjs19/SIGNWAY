@@ -8,8 +8,8 @@ const router = express.Router();
 router.get('/', async (req, res) => {
   try {
     const lessons = await Lesson.find({ published: true })
-      .select('slug title description level category order')
-      .sort({ order: 1 });
+      .select('slug title description level category moduleTitle moduleOrder order prerequisites learningObjectives contentReviewStatus')
+      .sort({ moduleOrder: 1, order: 1 });
 
     res.json({ success: true, data: lessons });
   } catch (error) {

@@ -16,12 +16,12 @@ async function getProgress(userId) {
       .sort({ completedAt: -1 })
       .lean(),
     Lesson.find({ published: true })
-      .select('_id slug title category level order')
-      .sort({ order: 1 })
+      .select('_id slug title category level moduleTitle moduleOrder order prerequisites')
+      .sort({ moduleOrder: 1, order: 1 })
       .lean(),
     Progress.findOne({ user: userId }).lean(),
     QuizAttempt.find({ user: userId })
-      .select('quiz mode assessmentFocus score total passed createdAt')
+      .select('quiz mode assessmentFocus score total passed createdAt answers')
       .sort({ createdAt: -1 })
       .limit(5)
       .lean(),
@@ -44,7 +44,7 @@ async function getProgress(userId) {
       _id: { $in: quizIds },
       published: true,
       lesson: { $in: lessons.map(lesson => lesson._id) },
-    }).select('_id title lesson').lean()
+    }).select('_id title lesson contentReviewStatus assessmentFocus questions').lean()
     : [];
   const quizById = new Map(quizzes.map(quiz => [String(quiz._id), quiz]));
   const recentActivity = [];
@@ -99,6 +99,53 @@ async function getProgress(userId) {
     };
     });
 
+  const completedIds = new Set(completionByLesson.keys());
+  const nextLesson = lessons.find(lesson => (
+    !completedIds.has(String(lesson._id))
+    && (lesson.prerequisites || []).every(prerequisite => (
+      completedIds.has(String(prerequisite?._id || prerequisite))
+    ))
+  )) || null;
+  const reviewSuggestionMap = new Map();
+  const reviewedAssessmentKeys = new Set();
+  for (const attempt of attempts) {
+    if (attempt.assessmentFocus !== 'isl-learning') continue;
+    const quiz = attempt.quiz ? quizById.get(String(attempt.quiz)) : null;
+    const assessmentKey = quiz
+      ? `quiz:${String(quiz._id)}`
+      : `full-course:${attempt.mode}`;
+    if (reviewedAssessmentKeys.has(assessmentKey)) continue;
+    reviewedAssessmentKeys.add(assessmentKey);
+    for (const answer of attempt.answers || []) {
+      if (answer.isCorrect) continue;
+      let lessonId = answer.lessonId;
+      let lessonTitle = answer.lessonTitle;
+      let topic = answer.topic || '';
+      let reviewed = answer.contentReviewStatus === 'reviewed';
+      if (quiz) {
+        if (quiz.contentReviewStatus !== 'reviewed') continue;
+        const question = quiz.questions.find(item => String(item._id) === String(answer.questionId));
+        if (!question || (question.contentReviewStatus || quiz.contentReviewStatus) !== 'reviewed') continue;
+        lessonId = quiz.lesson;
+        lessonTitle = lessonsById.get(String(quiz.lesson))?.title;
+        topic = question.topic || topic;
+        reviewed = true;
+      }
+      if (!reviewed || !lessonId || !lessonsById.has(String(lessonId))) continue;
+      const key = `${String(lessonId)}:${topic || 'lesson'}`;
+      const current = reviewSuggestionMap.get(key) || {
+        lessonId,
+        lessonTitle: lessonTitle || lessonsById.get(String(lessonId)).title,
+        topic: topic || null,
+        missedQuestions: 0,
+        attemptId: attempt._id,
+      };
+      current.missedQuestions += 1;
+      reviewSuggestionMap.set(key, current);
+    }
+  }
+  const reviewSuggestions = [...reviewSuggestionMap.values()].slice(0, 5);
+
   return {
     completedLessons,
     inProgressCount: inProgressIds.size,
@@ -109,10 +156,12 @@ async function getProgress(userId) {
       : 0,
     completedLessonIds: [...completionByLesson.keys()],
     inProgressLessons: [...inProgressIds].map(id => lessonsById.get(id)),
+    nextLesson,
     lastAccessedLesson: lessonsById.get(String(progress?.lastAccessedLesson)) || null,
     lastAccessedAt: progress?.lastAccessedAt || null,
     recentActivity: recentActivity.slice(0, 5),
     latestQuizResults,
+    reviewSuggestions,
     achievements: progress?.achievements || [],
     lastLessonCompletedAt: [...completionByLesson.values()]
       .sort((left, right) => new Date(right.completedAt) - new Date(left.completedAt))[0]?.completedAt || null,

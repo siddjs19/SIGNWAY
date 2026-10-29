@@ -120,6 +120,15 @@ export default function DashboardConnected({ user, onLogout }) {
       || lesson.category.toLowerCase().includes(query)
     ));
   }, [lessons, searchQuery]);
+  const lessonModules = useMemo(() => {
+    const groups = new Map();
+    for (const lesson of visibleLessons) {
+      const title = lesson.moduleTitle || lesson.category || 'Course lessons';
+      if (!groups.has(title)) groups.set(title, []);
+      groups.get(title).push(lesson);
+    }
+    return [...groups.entries()].map(([title, items]) => ({ title, lessons: items }));
+  }, [visibleLessons]);
   const currentSign = selectedLesson?.signs?.[selectedSignIndex] || null;
 
   const handleSidebarNavigate = (id) => {
@@ -520,6 +529,18 @@ export default function DashboardConnected({ user, onLogout }) {
             </div>
           )}
 
+          {selectedLesson.practiceActivities?.length > 0 && (
+            <div>
+              <h4 className="mb-2 text-sm font-bold text-sb-soft">Guided practice</h4>
+              <ul className="m-0 list-disc space-y-1 pl-5 text-sm leading-relaxed text-sb-body">
+                {selectedLesson.practiceActivities.map((activity) => <li key={activity}>{activity}</li>)}
+              </ul>
+              <p className="mb-0 mt-2 text-xs text-sb-muted">
+                These activities guide review of the linked source; they do not assess signing accuracy.
+              </p>
+            </div>
+          )}
+
           {selectedLesson.keyTakeaways?.length > 0 && (
             <div>
               <h4 className="mb-2 text-sm font-bold text-sb-soft">Key takeaways</h4>
@@ -778,6 +799,68 @@ export default function DashboardConnected({ user, onLogout }) {
         </div>
       </section>
 
+      <section className="grid gap-6 lg:grid-cols-2" aria-label="Learning recommendations">
+        <article className={`${cardSurface} space-y-3 p-6`}>
+          <p className="sb-integration-eyebrow">Next in your path</p>
+          {pageLoading ? (
+            <p className="sb-integration-state" role="status">Finding the next available lesson…</p>
+          ) : progress?.nextLesson ? (
+            <>
+              <h2 className="m-0 text-lg font-extrabold text-sb-soft">{progress.nextLesson.title}</h2>
+              <p className="m-0 text-sm text-sb-muted">
+                {progress.nextLesson.moduleTitle || progress.nextLesson.category} · {progress.nextLesson.level}
+              </p>
+              <button
+                type="button"
+                className={primaryButton}
+                onClick={() => {
+                  const nextLesson = lessons.find(item => String(item._id) === String(progress.nextLesson._id));
+                  if (nextLesson) openLesson(nextLesson);
+                  else setActiveNav('lessons');
+                }}
+              >
+                {inProgressLessonIds.has(String(progress.nextLesson._id)) ? 'Resume lesson' : 'Start lesson'}
+                <ArrowRight size={16} />
+              </button>
+            </>
+          ) : (
+            <p className="m-0 text-sm text-sb-muted">
+              No eligible next lesson is available. You can revisit any published lesson from the catalogue.
+            </p>
+          )}
+        </article>
+        <article className={`${cardSurface} space-y-3 p-6`}>
+          <p className="sb-integration-eyebrow">Review suggestions</p>
+          {pageLoading ? (
+            <p className="sb-integration-state" role="status">Checking reviewed assessment results…</p>
+          ) : (progress?.reviewSuggestions || []).length === 0 ? (
+            <p className="m-0 text-sm text-sb-muted">
+              No review suggestions from qualified-review ISL learning questions yet. Resource checks do not infer language weaknesses.
+            </p>
+          ) : (
+            <ul className="m-0 space-y-3 p-0">
+              {progress.reviewSuggestions.map(suggestion => {
+                const lesson = lessons.find(item => String(item._id) === String(suggestion.lessonId));
+                return (
+                  <li className="flex flex-wrap items-center justify-between gap-3" key={`${suggestion.lessonId}-${suggestion.topic || 'lesson'}`}>
+                    <span className="text-sm text-sb-body">
+                      Revisit <strong className="text-sb-soft">{suggestion.topic || suggestion.lessonTitle}</strong>
+                      {suggestion.topic ? ` · ${suggestion.lessonTitle}` : ''}
+                      {' '}({suggestion.missedQuestions} missed)
+                    </span>
+                    {lesson && (
+                      <button type="button" className={outlineButton} onClick={() => openLesson(lesson)}>
+                        Review lesson
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </article>
+      </section>
+
       <section className="rounded-3xl border border-[rgba(92,225,214,0.14)] bg-[rgba(24,48,65,0.7)] p-6 shadow-sm backdrop-blur-xl">
         <h2 className="mb-4 flex items-center gap-2.5 text-lg font-extrabold text-sb-soft">
           <ClipboardCheck size={18} className="text-sb-signal" />Latest quiz results
@@ -838,21 +921,6 @@ export default function DashboardConnected({ user, onLogout }) {
         </div>
       ) : (
         <>
-          <div className="sb-modules-nav-pills" role="group" aria-label="Published lessons">
-            {visibleLessons.map((lesson) => (
-              <button
-                type="button"
-                key={lesson._id}
-                className={`sb-module-pill ${selectedLesson?._id === lesson._id ? 'active' : ''}`}
-                onClick={() => openLesson(lesson)}
-              >
-                <BookOpen size={17} />
-                <span>{lesson.title}</span>
-                {completedLessonIds.has(String(lesson._id)) && <CheckCircle2 size={16} />}
-              </button>
-            ))}
-            {visibleLessons.length === 0 && <p className="sb-integration-empty-copy">No lessons match your search.</p>}
-          </div>
           <div className="sb-integration-lesson-list">
             <label className="sb-nav-search">
               <Search size={16} />
@@ -865,6 +933,71 @@ export default function DashboardConnected({ user, onLogout }) {
               />
             </label>
           </div>
+          {lessonModules.length === 0 ? (
+            <p className="sb-integration-empty-copy">No lessons match your search.</p>
+          ) : (
+            <div className="space-y-6">
+              {lessonModules.map((module, moduleIndex) => (
+                <section key={module.title} className={`${cardSurface} space-y-4 p-5`}>
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <h2 className="m-0 text-lg font-extrabold text-sb-soft">{module.title}</h2>
+                    <span className="text-xs text-sb-muted">
+                      Module {moduleIndex + 1} · {module.lessons.length} {module.lessons.length === 1 ? 'lesson' : 'lessons'}
+                    </span>
+                  </div>
+                  <ol className="space-y-3">
+                    {module.lessons.map((lesson, lessonIndex) => {
+                      const completed = completedLessonIds.has(String(lesson._id));
+                      const inProgress = inProgressLessonIds.has(String(lesson._id));
+                      const isNext = String(progress?.nextLesson?._id) === String(lesson._id);
+                      const unmetPrerequisites = (lesson.prerequisites || []).filter(prerequisite => (
+                        !completedLessonIds.has(String(prerequisite?._id || prerequisite))
+                      ));
+                      const prerequisiteTitles = unmetPrerequisites.map(prerequisite => (
+                        lessons.find(item => String(item._id) === String(prerequisite?._id || prerequisite))?.title
+                      )).filter(Boolean);
+                      return (
+                        <li key={lesson._id}>
+                          <button
+                            type="button"
+                            disabled={unmetPrerequisites.length > 0}
+                            className={`${cardSurface} flex w-full flex-wrap items-center justify-between gap-3 p-4 text-left transition hover:border-sb-signal focus-visible:outline-2 focus-visible:outline-sb-signal`}
+                            onClick={() => openLesson(lesson)}
+                          >
+                            <span className="flex min-w-0 items-center gap-3">
+                              <span className="grid size-8 shrink-0 place-items-center rounded-full border border-[rgba(92,225,214,0.2)] text-xs font-bold text-sb-signal">
+                                {completed ? <CheckCircle2 size={16} /> : lessonIndex + 1}
+                              </span>
+                              <span className="min-w-0">
+                                <span className="block font-bold text-sb-soft">{lesson.title}</span>
+                                {lesson.learningObjectives?.length > 0 && (
+                                  <span className="mt-1 block text-xs text-sb-muted">
+                                    {lesson.learningObjectives.length} learning objectives
+                                  </span>
+                                )}
+                                {prerequisiteTitles.length > 0 && (
+                                  <span className="mt-1 block text-xs text-amber-200">
+                                    Complete first: {prerequisiteTitles.join(', ')}
+                                  </span>
+                                )}
+                              </span>
+                            </span>
+                            <span className="flex items-center gap-2">
+                              {isNext && <span className="sb-lesson-badge badge-active">Next</span>}
+                              {unmetPrerequisites.length > 0 && <span className="sb-lesson-badge">Locked</span>}
+                              <span className={`sb-lesson-badge ${completed ? 'badge-completed' : 'badge-active'}`}>
+                                {completed ? 'Completed' : inProgress ? 'In progress' : 'Not started'}
+                              </span>
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </section>
+              ))}
+            </div>
+          )}
           {renderLessonDetail()}
         </>
       )}

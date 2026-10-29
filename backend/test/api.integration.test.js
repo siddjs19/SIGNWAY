@@ -26,6 +26,9 @@ const ids = {
   sixthQuestion: '64b000000000000000000043',
   secondQuiz: '64b000000000000000000011',
   secondLesson: '64b000000000000000000022',
+  questionTypeQuiz: '64b000000000000000000016',
+  multipleQuestion: '64b000000000000000000048',
+  videoQuestion: '64b000000000000000000049',
 };
 
 const secondPublishedLesson = {
@@ -35,6 +38,8 @@ const secondPublishedLesson = {
   description: 'A second published lesson.',
   level: 'beginner',
   category: 'Communication',
+  moduleTitle: 'Module 1: Greetings',
+  moduleOrder: 2,
   order: 2,
   published: true,
 };
@@ -101,6 +106,38 @@ const pendingLearningQuiz = {
   ],
 };
 
+const questionTypeQuiz = {
+  _id: ids.questionTypeQuiz,
+  title: 'Question format coverage',
+  lesson: ids.lesson,
+  published: true,
+  assessmentFocus: 'course-metadata',
+  contentReviewStatus: 'pending',
+  questions: [
+    {
+      _id: ids.multipleQuestion,
+      prompt: 'Select both listed source formats.',
+      questionType: 'multiple-choice',
+      difficulty: 'beginner',
+      topic: 'resource metadata',
+      options: ['Video', 'Audio', 'Playlist'],
+      correctAnswer: ['Video', 'Playlist'],
+      explanation: 'The source records list the video and playlist.',
+    },
+    {
+      _id: ids.videoQuestion,
+      prompt: 'Review the linked source clip.',
+      questionType: 'video-based',
+      mediaType: 'video',
+      mediaUrl: 'https://media.example.test/source.mp4',
+      difficulty: 'beginner',
+      options: ['Reviewed', 'Not reviewed'],
+      correctAnswer: 'Reviewed',
+      explanation: 'The clip is a source reference.',
+    },
+  ],
+};
+
 const quizOnUnpublishedLesson = {
   _id: '64b000000000000000000012',
   title: 'Quiz attached to unpublished lesson',
@@ -161,7 +198,10 @@ const publishedLesson = {
   description: 'A reviewed lesson.',
   level: 'beginner',
   category: 'Foundations',
+  moduleTitle: 'Course orientation',
+  moduleOrder: 1,
   order: 1,
+  learningObjectives: ['Identify the verified source metadata.'],
   published: true,
   signs: [],
   resources: [{
@@ -253,6 +293,7 @@ let server;
 let apiUrl;
 let limitedCoursePool = false;
 let metadataOnlyCoursePool = false;
+let questionTypeQuizEnabled = false;
 
 before(async () => {
   const completions = new Map();
@@ -261,7 +302,15 @@ before(async () => {
 
   User.findById = async (userId) => ({ _id: String(userId) });
   Quiz.find = (filter) => {
-    const allQuizzes = [quiz, courseQuiz, metadataQuiz, metadataQuizFirstLesson, pendingLearningQuiz, quizOnUnpublishedLesson];
+    const allQuizzes = [
+      quiz,
+      courseQuiz,
+      metadataQuiz,
+      metadataQuizFirstLesson,
+      pendingLearningQuiz,
+      quizOnUnpublishedLesson,
+      ...(questionTypeQuizEnabled ? [questionTypeQuiz] : []),
+    ];
     const publishedQuizzes = metadataOnlyCoursePool
       ? [metadataQuiz, metadataQuizFirstLesson, quizOnUnpublishedLesson]
       : limitedCoursePool
@@ -276,7 +325,8 @@ before(async () => {
         : true));
   };
   Quiz.findOne = (filter) => query(
-    [quiz, courseQuiz, metadataQuiz, metadataQuizFirstLesson].find(item => String(item._id) === String(filter._id)) || null,
+    [quiz, courseQuiz, metadataQuiz, metadataQuizFirstLesson, ...(questionTypeQuizEnabled ? [questionTypeQuiz] : [])]
+      .find(item => String(item._id) === String(filter._id)) || null,
   );
   QuizAttempt.create = async (attempt) => {
     const savedAttempt = {
@@ -391,6 +441,8 @@ test('lesson catalog returns published records and keeps drafts hidden from lear
   assert.equal(catalog.success, true);
   assert.equal(catalog.data.length, 2);
   assert.equal(catalog.data[0].title, publishedLesson.title);
+  assert.equal(catalog.data[0].moduleTitle, 'Course orientation');
+  assert.equal(catalog.data[1].moduleOrder, 2);
   assert.equal(catalog.data.some((lesson) => lesson._id === draftLesson._id), false);
 
   const detailResponse = await fetch(`${apiUrl}/lessons/${ids.lesson}`);
@@ -696,6 +748,9 @@ test('auth protects quiz submission, withholds answers, and tracks unique user c
   const loadedQuiz = await quizResponse.json();
   assert.equal(loadedQuiz.data.questions.length, 2);
   assert.equal('correctAnswer' in loadedQuiz.data.questions[0], false);
+  assert.equal(loadedQuiz.data.questions[0].questionType, 'single-choice');
+  assert.equal(loadedQuiz.data.questions[0].difficulty, 'beginner');
+  assert.equal(loadedQuiz.data.questions[0].contentReviewStatus, 'pending');
 
   const invalidAttempt = await fetch(`${apiUrl}/quizzes/${ids.quiz}/attempts`, {
     method: 'POST',
@@ -726,6 +781,11 @@ test('auth protects quiz submission, withholds answers, and tracks unique user c
   assert.equal(attempt.data.total, 2);
   assert.equal(attempt.data.answers[0].correctAnswer, 'Correct');
   assert.equal(server.testState.attempts.at(-1).user, ids.user);
+  assert.equal(attempt.data.answers[0].lessonId, ids.lesson);
+  const learnerFeedbackResponse = await fetch(`${apiUrl}/progress`, { headers: authHeaders });
+  const learnerFeedback = await learnerFeedbackResponse.json();
+  assert.equal(learnerFeedback.progress.reviewSuggestions[0].lessonId, ids.lesson);
+  assert.equal(learnerFeedback.progress.reviewSuggestions[0].missedQuestions, 1);
 
   const invalidCompletion = await fetch(`${apiUrl}/progress/complete-lesson`, {
     method: 'PATCH',
@@ -757,6 +817,8 @@ test('auth protects quiz submission, withholds answers, and tracks unique user c
   });
   const otherUserData = await otherUserProgress.json();
   assert.equal(otherUserData.progress.completedLessons, 0);
+  assert.equal(String(otherUserData.progress.nextLesson._id), ids.lesson);
+  assert.equal(String(firstProgress.progress.nextLesson._id), ids.secondLesson);
 });
 
 test('lesson access persists per-user progress without conflating quiz attempts and completion', async () => {
@@ -765,6 +827,7 @@ test('lesson access persists per-user progress without conflating quiz attempts 
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ lessonId: ids.lesson }),
   });
+
   assert.equal(unauthenticated.status, 401);
 
   const headers = {
@@ -842,4 +905,58 @@ test('lesson access persists per-user progress without conflating quiz attempts 
   const revisitData = await revisitCompleted.json();
   assert.equal(revisitData.progress.completedLessons, 1);
   assert.equal(revisitData.progress.inProgressCount, 0);
+});
+
+test('quiz delivery supports multiple-choice and video question metadata without exposing answers', async () => {
+  questionTypeQuizEnabled = true;
+  const headers = {
+    Authorization: `Bearer ${tokenFor(ids.user)}`,
+    'Content-Type': 'application/json',
+  };
+  const beforeAttemptCount = server.testState.attempts.length;
+  try {
+    const quizResponse = await fetch(`${apiUrl}/quizzes/${ids.questionTypeQuiz}`, { headers });
+    assert.equal(quizResponse.status, 200);
+    const delivered = await quizResponse.json();
+    assert.equal(delivered.data.questions[0].questionType, 'multiple-choice');
+    assert.equal(delivered.data.questions[0].difficulty, 'beginner');
+    assert.equal(delivered.data.questions[0].topic, 'resource metadata');
+    assert.equal(delivered.data.questions[1].questionType, 'video-based');
+    assert.equal(delivered.data.questions[1].mediaType, 'video');
+    assert.equal(delivered.data.questions.every(question => !('correctAnswer' in question)), true);
+    assert.equal(delivered.data.questions.every(question => !('explanation' in question)), true);
+
+    const malformed = await fetch(`${apiUrl}/quizzes/${ids.questionTypeQuiz}/attempts`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        answers: [
+          { questionId: ids.multipleQuestion, selectedAnswer: ['Video', 'Video'] },
+          { questionId: ids.videoQuestion, selectedAnswer: 'Reviewed' },
+        ],
+      }),
+    });
+    assert.equal(malformed.status, 400);
+    assert.equal(server.testState.attempts.length, beforeAttemptCount);
+
+    const submitted = await fetch(`${apiUrl}/quizzes/${ids.questionTypeQuiz}/attempts`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        answers: [
+          { questionId: ids.multipleQuestion, selectedAnswer: ['Playlist', 'Video'] },
+          { questionId: ids.videoQuestion, selectedAnswer: 'Reviewed' },
+        ],
+      }),
+    });
+    assert.equal(submitted.status, 201);
+    const result = await submitted.json();
+    assert.equal(result.data.score, 100);
+    assert.deepEqual(result.data.answers[0].correctAnswer, ['Video', 'Playlist']);
+    assert.equal(result.data.answers[0].topic, 'resource metadata');
+    assert.equal(result.data.answers[1].questionType, 'video-based');
+    assert.equal(server.testState.attempts.at(-1).answers.length, 2);
+  } finally {
+    questionTypeQuizEnabled = false;
+  }
 });

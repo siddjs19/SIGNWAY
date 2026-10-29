@@ -47,6 +47,7 @@ const lessonSchema = new mongoose.Schema(
     learningObjectives: { type: [String], default: [] },
     keyTakeaways: { type: [String], default: [] },
     completionChecklist: { type: [String], default: [] },
+    practiceActivities: { type: [String], default: [] },
     contentReviewStatus: {
       type: String,
       enum: ['pending', 'reviewed'],
@@ -59,7 +60,13 @@ const lessonSchema = new mongoose.Schema(
       default: 'beginner',
     },
     category: { type: String, required: true },
+    moduleTitle: { type: String, default: '' },
+    moduleOrder: { type: Number, default: 0, min: 0 },
     order: { type: Number, default: 0 },
+    prerequisites: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Lesson',
+    }],
     signs: [signSchema],
     resources: { type: [learningResourceSchema], default: [] },
     published: { type: Boolean, default: false },
