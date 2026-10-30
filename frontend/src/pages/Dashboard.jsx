@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   AlertCircle,
@@ -7,10 +7,12 @@ import {
   BookOpen,
   CheckCircle2,
   ClipboardCheck,
+  Camera,
   Database,
   Eye,
   FileCheck,
   Languages,
+  Loader2,
   MessageSquare,
   PlayCircle,
   Radio,
@@ -27,12 +29,67 @@ import {
 } from 'lucide-react';
 import api from '../services/api';
 import AppSidebar from '../components/AppSidebar';
+import {
+  createHandLandmarker,
+  extractHandLandmarks,
+  normalizeRecognitionFrame,
+} from '../services/handLandmarker';
+import { startIslBridgeRecognitionLoop } from '../services/islBridgeRecognitionLoop';
 import './Dashboard.css';
 
 const cardSurface = 'rounded-3xl border border-[rgba(92,225,214,0.14)] bg-[rgba(24,48,65,0.7)] shadow-sm backdrop-blur-xl';
 const columnCard = `${cardSurface} flex flex-col gap-5 p-6`;
 const primaryButton = 'inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-sb-signal to-[#48e2d6] px-5 py-2.5 text-sm font-extrabold text-sb-midnight shadow-md transition hover:opacity-95 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sb-signal disabled:cursor-not-allowed disabled:opacity-60';
 const outlineButton = 'inline-flex items-center justify-center gap-2 rounded-xl border border-[rgba(92,225,214,0.14)] bg-[rgba(24,48,65,0.6)] px-5 py-2.5 text-sm font-extrabold text-sb-signal transition hover:border-sb-signal hover:bg-[rgba(24,48,65,0.95)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sb-signal disabled:cursor-not-allowed disabled:opacity-60';
+const RECOGNITION_FRAME_COUNT = 30;
+const MAX_ISL_BRIDGE_IMAGE_BYTES = 2 * 1024 * 1024;
+const ISL_BRIDGE_DEFAULT_INTERVAL_MS = 700;
+const ISL_BRIDGE_MAX_FRAME_WIDTH = 480;
+
+function captureJpegDataUrl(video) {
+  if (
+    !video
+    || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA
+    || video.videoWidth === 0
+    || video.videoHeight === 0
+  ) {
+    return Promise.reject(new Error('The camera preview is not ready. Wait for a frame and try again.'));
+  }
+
+  const canvas = document.createElement('canvas');
+  const scale = Math.min(1, ISL_BRIDGE_MAX_FRAME_WIDTH / video.videoWidth);
+  canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+  canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+  const context = canvas.getContext('2d');
+  if (!context) {
+    return Promise.reject(new Error('Could not prepare a camera frame for recognition.'));
+  }
+  context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error('Could not capture a JPEG frame from the camera.'));
+        return;
+      }
+      if (blob.size > MAX_ISL_BRIDGE_IMAGE_BYTES) {
+        reject(new Error('Captured frame is larger than the 2 MiB limit. Try reducing camera resolution.'));
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (typeof reader.result === 'string' && reader.result.startsWith('data:image/jpeg;base64,')) {
+          resolve(reader.result);
+        } else {
+          reject(new Error('The camera frame could not be encoded as JPEG.'));
+        }
+      };
+      reader.onerror = () => reject(new Error('Could not read the captured JPEG frame.'));
+      reader.readAsDataURL(blob);
+    }, 'image/jpeg', 0.65);
+  });
+}
 
 function errorMessage(error, fallback) {
   return error.response?.data?.message || fallback;
@@ -102,6 +159,32 @@ export default function DashboardConnected({ user, onLogout }) {
   const [lessonError, setLessonError] = useState('');
   const [quizError, setQuizError] = useState('');
   const [toastMessage, setToastMessage] = useState('');
+  const [cameraStatus, setCameraStatus] = useState('idle');
+  const [landmarkerStatus, setLandmarkerStatus] = useState('idle');
+  const [cameraError, setCameraError] = useState('');
+  const [landmarkerError, setLandmarkerError] = useState('');
+  const [detectedHandCount, setDetectedHandCount] = useState(0);
+  const [landmarkConsent, setLandmarkConsent] = useState(false);
+  const [recognitionRequestStatus, setRecognitionRequestStatus] = useState('idle');
+  const [recognitionMessage, setRecognitionMessage] = useState('');
+  const [recognitionPrediction, setRecognitionPrediction] = useState(null);
+  const [recognitionFrameCount, setRecognitionFrameCount] = useState(0);
+  const [islBridgeConsent, setIslBridgeConsent] = useState(false);
+  const [islBridgeStatus, setIslBridgeStatus] = useState('idle');
+  const [islBridgeError, setIslBridgeError] = useState('');
+  const [islBridgeResult, setIslBridgeResult] = useState(null);
+  const [islBridgeIsRunning, setIslBridgeIsRunning] = useState(false);
+  const [islBridgeLatencyMs, setIslBridgeLatencyMs] = useState(null);
+  const [recognitionProviderMode, setRecognitionProviderMode] = useState('isl-bridge');
+  const cameraVideoRef = useRef(null);
+  const cameraStreamRef = useRef(null);
+  const cameraStartTokenRef = useRef(0);
+  const handLandmarkerRef = useRef(null);
+  const detectionFrameRef = useRef(null);
+  const recognitionFramesRef = useRef([]);
+  const recognitionRequestInFlightRef = useRef(false);
+  const islBridgeRequestInFlightRef = useRef(false);
+  const islBridgeRecognitionStopRef = useRef(null);
 
   const completedLessonIds = useMemo(
     () => new Set((progress?.completedLessonIds || []).map(String)),
@@ -131,13 +214,314 @@ export default function DashboardConnected({ user, onLogout }) {
   }, [visibleLessons]);
   const currentSign = selectedLesson?.signs?.[selectedSignIndex] || null;
 
+  const stopRecognitionCamera = useCallback(() => {
+    islBridgeRecognitionStopRef.current?.();
+    islBridgeRecognitionStopRef.current = null;
+    setIslBridgeIsRunning(false);
+    cameraStartTokenRef.current += 1;
+    window.cancelAnimationFrame(detectionFrameRef.current);
+    detectionFrameRef.current = null;
+    cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+    cameraStreamRef.current = null;
+    handLandmarkerRef.current?.close();
+    handLandmarkerRef.current = null;
+    if (cameraVideoRef.current) cameraVideoRef.current.srcObject = null;
+    recognitionFramesRef.current = [];
+    setDetectedHandCount(0);
+    setRecognitionFrameCount(0);
+    setRecognitionPrediction(null);
+    setRecognitionRequestStatus('idle');
+    setRecognitionMessage('');
+    setIslBridgeConsent(false);
+    setIslBridgeStatus('idle');
+    setIslBridgeError('');
+    setIslBridgeResult(null);
+    setIslBridgeLatencyMs(null);
+    setLandmarkConsent(false);
+    setCameraStatus('idle');
+    setLandmarkerStatus('idle');
+    setLandmarkerError('');
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      islBridgeRecognitionStopRef.current?.();
+      islBridgeRecognitionStopRef.current = null;
+      cameraStartTokenRef.current += 1;
+      window.cancelAnimationFrame(detectionFrameRef.current);
+      cameraStreamRef.current?.getTracks().forEach((track) => track.stop());
+      handLandmarkerRef.current?.close();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (activeNav !== 'studio' && (cameraStatus === 'starting' || cameraStreamRef.current)) {
+      stopRecognitionCamera();
+    }
+  }, [activeNav, cameraStatus, stopRecognitionCamera]);
+
   const handleSidebarNavigate = (id) => {
     if (id === 'quizzes') {
       navigate('/quiz');
       return;
     }
+    if (id === 'practitioners') {
+      navigate('/practitioners');
+      return;
+    }
+    if (id === 'credentials') {
+      navigate('/credentials');
+      return;
+    }
     setActiveNav(id);
   };
+
+  async function startRecognitionCamera() {
+    if (cameraStatus === 'starting' || cameraStatus === 'active') return;
+    const startToken = cameraStartTokenRef.current + 1;
+    cameraStartTokenRef.current = startToken;
+    setCameraStatus('starting');
+    setCameraError('');
+    setLandmarkerError('');
+    setRecognitionMessage('');
+    setRecognitionRequestStatus('idle');
+    setRecognitionPrediction(null);
+    recognitionFramesRef.current = [];
+    setRecognitionFrameCount(0);
+    setLandmarkConsent(false);
+    setIslBridgeConsent(false);
+    setIslBridgeStatus('idle');
+    setIslBridgeError('');
+    setIslBridgeResult(null);
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setCameraStatus('unavailable');
+      setCameraError('Camera access is unavailable in this browser or page context. Use a supported browser over HTTPS or localhost.');
+      return;
+    }
+
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: { facingMode: 'user' },
+      });
+    } catch (error) {
+      if (cameraStartTokenRef.current !== startToken) return;
+      if (error.name === 'NotAllowedError' || error.name === 'SecurityError') {
+        setCameraStatus('denied');
+        setCameraError('Camera permission was denied. Allow camera access in your browser settings, then try again.');
+      } else if (['NotFoundError', 'DevicesNotFoundError', 'NotReadableError', 'OverconstrainedError'].includes(error.name)) {
+        setCameraStatus('unavailable');
+        setCameraError('No usable camera is available. Connect or enable a camera, then try again.');
+      } else {
+        setCameraStatus('error');
+        setCameraError('The camera could not be started. Please try again.');
+      }
+      return;
+    }
+
+    if (cameraStartTokenRef.current !== startToken) {
+      stream.getTracks().forEach((track) => track.stop());
+      return;
+    }
+    cameraStreamRef.current = stream;
+    if (!cameraVideoRef.current) {
+      stream.getTracks().forEach((track) => track.stop());
+      cameraStreamRef.current = null;
+      setCameraStatus('error');
+      setCameraError('The camera preview could not be initialized.');
+      return;
+    }
+
+    cameraVideoRef.current.srcObject = stream;
+    try {
+      await cameraVideoRef.current.play();
+    } catch {
+      if (cameraStartTokenRef.current !== startToken) return;
+      stopRecognitionCamera();
+      setCameraStatus('error');
+      setCameraError('The local camera preview could not be played.');
+      return;
+    }
+    if (cameraStartTokenRef.current !== startToken) return;
+    setCameraStatus('active');
+    setLandmarkerStatus('loading');
+
+    let landmarker;
+    try {
+      landmarker = await createHandLandmarker();
+    } catch {
+      if (cameraStartTokenRef.current !== startToken) return;
+      setLandmarkerStatus('error');
+      setLandmarkerError('MediaPipe could not load its browser runtime or hand-landmark model. Check your connection and try restarting the camera.');
+      return;
+    }
+
+    if (cameraStreamRef.current !== stream || cameraStartTokenRef.current !== startToken) {
+      landmarker.close();
+      return;
+    }
+
+    handLandmarkerRef.current = landmarker;
+    setLandmarkerStatus('ready');
+    let lastDetectionTime = 0;
+
+    const detectHands = (timestamp) => {
+      const video = cameraVideoRef.current;
+      if (!cameraStreamRef.current || !handLandmarkerRef.current || !video) return;
+
+      if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && timestamp - lastDetectionTime >= 100) {
+        lastDetectionTime = timestamp;
+        try {
+          const result = handLandmarkerRef.current.detectForVideo(video, timestamp);
+          const payload = extractHandLandmarks(result);
+          setDetectedHandCount(payload.hands.length);
+          const frame = normalizeRecognitionFrame(payload.hands);
+          if (frame) {
+            const nextFrames = [...recognitionFramesRef.current, frame].slice(-RECOGNITION_FRAME_COUNT);
+            recognitionFramesRef.current = nextFrames;
+            setRecognitionFrameCount(nextFrames.length);
+          }
+        } catch {
+          setLandmarkerStatus('error');
+          setLandmarkerError('Local hand-landmark extraction failed. Stop and restart the camera to try again.');
+          recognitionFramesRef.current = [];
+          setRecognitionFrameCount(0);
+          setDetectedHandCount(0);
+          handLandmarkerRef.current.close();
+          handLandmarkerRef.current = null;
+          return;
+        }
+      }
+      detectionFrameRef.current = window.requestAnimationFrame(detectHands);
+    };
+
+    detectionFrameRef.current = window.requestAnimationFrame(detectHands);
+  }
+
+  async function recognizeCurrentSign() {
+    if (
+      recognitionRequestInFlightRef.current
+      || !landmarkConsent
+      || recognitionFramesRef.current.length !== RECOGNITION_FRAME_COUNT
+    ) return;
+
+    recognitionRequestInFlightRef.current = true;
+    setRecognitionRequestStatus('loading');
+    setRecognitionMessage('');
+    setRecognitionPrediction(null);
+    try {
+      const response = await api.post('/recognition/landmarks', {
+        sequence: recognitionFramesRef.current,
+      });
+      if (!response.data?.success) {
+        throw new Error('The recognition service returned an invalid response.');
+      }
+      if (response.data.abstained === true) {
+        setRecognitionRequestStatus('abstained');
+        setRecognitionMessage(response.data.message || 'Jestally did not return a sign for this sequence.');
+        return;
+      }
+      if (!response.data?.prediction?.sign) {
+        throw new Error('The recognition service returned an invalid response.');
+      }
+      setRecognitionPrediction(response.data.prediction);
+      setRecognitionRequestStatus('success');
+    } catch (error) {
+      if (error.response?.status === 401) {
+        onLogout();
+      } else {
+        setRecognitionRequestStatus('error');
+        setRecognitionMessage(
+          error.response?.data?.message
+          || error.message
+          || 'Recognition failed. No prediction was produced.',
+        );
+      }
+    } finally {
+      recognitionRequestInFlightRef.current = false;
+    }
+  }
+
+  function startContinuousIslBridgeRecognition() {
+    if (
+      islBridgeRecognitionStopRef.current
+      || cameraStatus !== 'active'
+      || !islBridgeConsent
+    ) return;
+
+    setIslBridgeError('');
+    setIslBridgeResult(null);
+    setIslBridgeLatencyMs(null);
+    setIslBridgeStatus('running');
+    setIslBridgeIsRunning(true);
+    islBridgeRecognitionStopRef.current = startIslBridgeRecognitionLoop({
+      intervalMs: ISL_BRIDGE_DEFAULT_INTERVAL_MS,
+      captureFrame: () => captureJpegDataUrl(cameraVideoRef.current),
+      submitFrame: async (image) => {
+        const response = await api.post('/recognition/isl-bridge/frame', {
+          image,
+          language: 'en',
+        });
+        if (
+          response.data?.success !== true
+          || !response.data?.result
+          || !['sign', 'word', 'sentence'].every((key) => (
+            typeof response.data.result[key] === 'string'
+          ))
+        ) {
+          throw new Error('ISL Bridge returned an invalid response.');
+        }
+        return response.data.result;
+      },
+      onRequestStart: () => {
+        setIslBridgeStatus('loading');
+        setIslBridgeError('');
+      },
+      onResult: (result) => {
+        setIslBridgeResult(result);
+        setIslBridgeStatus('success');
+        setIslBridgeError('');
+      },
+      onEmpty: () => setIslBridgeStatus('empty'),
+      onError: (error) => {
+        if (error.response?.status === 401) {
+          onLogout();
+          return;
+        }
+        setIslBridgeStatus('error');
+        setIslBridgeError(
+          error.response?.data?.message
+          || error.message
+          || 'ISL Bridge recognition failed. No result was produced.',
+        );
+      },
+      onLatency: (latencyMs) => setIslBridgeLatencyMs(Math.round(latencyMs)),
+      requestLock: islBridgeRequestInFlightRef,
+    });
+  }
+
+  function stopContinuousIslBridgeRecognition() {
+    islBridgeRecognitionStopRef.current?.();
+    islBridgeRecognitionStopRef.current = null;
+    setIslBridgeIsRunning(false);
+    if (islBridgeStatus === 'running' || islBridgeStatus === 'loading') {
+      setIslBridgeStatus(islBridgeResult ? 'success' : 'idle');
+    }
+  }
+
+  function selectRecognitionProvider(provider) {
+    stopContinuousIslBridgeRecognition();
+    setRecognitionProviderMode(provider);
+    setRecognitionRequestStatus('idle');
+    setRecognitionMessage('');
+    setRecognitionPrediction(null);
+    setIslBridgeStatus('idle');
+    setIslBridgeError('');
+    setIslBridgeResult(null);
+    setIslBridgeLatencyMs(null);
+  }
 
   useEffect(() => {
     let active = true;
@@ -363,7 +747,7 @@ export default function DashboardConnected({ user, onLogout }) {
     const videoFailed = activeResource && failedVideoIds.has(activeResource.videoId);
 
     return (
-      <article className="mx-auto flex w-full max-w-[1120px] flex-col gap-7">
+      <article className="mx-auto flex w-full max-w-280 flex-col gap-7">
         <nav className="flex flex-wrap items-center justify-between gap-3" aria-label="Lesson navigation">
           <button
             type="button"
@@ -658,9 +1042,9 @@ export default function DashboardConnected({ user, onLogout }) {
   };
 
   const renderOverview = () => (
-    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-8 p-5 sm:p-8 lg:px-9">
+    <div className="mx-auto flex w-full max-w-350 flex-col gap-8 p-5 sm:p-8 lg:px-9">
       <ApiError>{pageError}</ApiError>
-      <section className="relative flex items-center justify-between gap-6 overflow-hidden rounded-3xl border border-[rgba(92,225,214,0.25)] bg-gradient-to-br from-[#102738] via-sb-slate to-[#1e3f59] p-6 text-sb-soft shadow-2xl sm:p-9 max-sm:flex-col max-sm:items-start">
+      <section className="relative flex items-center justify-between gap-6 overflow-hidden rounded-3xl border border-[rgba(92,225,214,0.25)] bg-linear-to-br from-[#102738] via-sb-slate to-[#1e3f59] p-6 text-sb-soft shadow-2xl sm:p-9 max-sm:flex-col max-sm:items-start">
         <div className="relative z-10">
           <h1 className="mb-2 text-2xl font-extrabold tracking-tight sm:text-3xl">Welcome back, {profile?.name || 'learner'}! 👋</h1>
           <p className="max-w-2xl text-sm leading-relaxed text-sb-body">
@@ -668,7 +1052,7 @@ export default function DashboardConnected({ user, onLogout }) {
             No recognition metrics or unverified learning totals are shown.
           </p>
         </div>
-        <button type="button" className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-gradient-to-br from-sb-signal to-[#4de4d8] px-6 py-3.5 text-sm font-extrabold text-sb-midnight shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sb-signal" onClick={() => setActiveNav('lessons')}>
+        <button type="button" className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-linear-to-br from-sb-signal to-[#4de4d8] px-6 py-3.5 text-sm font-extrabold text-sb-midnight shadow-lg transition hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sb-signal" onClick={() => setActiveNav('lessons')}>
           <PlayCircle size={18} /><span>Browse lessons</span>
         </button>
       </section>
@@ -696,13 +1080,13 @@ export default function DashboardConnected({ user, onLogout }) {
             <span className="mb-4 flex-1 text-sm leading-relaxed text-sb-muted">The recognition and communication workspace is not available yet.</span>
             <span className="mt-auto flex items-center gap-1.5 text-sm font-bold text-sb-signal">Coming soon <ArrowRight size={14} /></span>
           </button>
-          <button type="button" className="group relative flex flex-col rounded-2xl border border-[rgba(92,225,214,0.14)] bg-[rgba(24,48,65,0.7)] p-6 text-left text-sb-body shadow-sm backdrop-blur-xl transition duration-200 hover:-translate-y-1 hover:border-sb-signal hover:bg-[rgba(24,48,65,0.95)] hover:shadow-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sb-signal" onClick={() => setActiveNav('community')}>
+          <button type="button" className="group relative flex flex-col rounded-2xl border border-[rgba(92,225,214,0.14)] bg-[rgba(24,48,65,0.7)] p-6 text-left text-sb-body shadow-sm backdrop-blur-xl transition duration-200 hover:-translate-y-1 hover:border-sb-signal hover:bg-[rgba(24,48,65,0.95)] hover:shadow-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sb-signal" onClick={() => navigate('/practitioners')}>
             <span className="mb-4 grid size-13 place-items-center rounded-2xl border border-sb-signal bg-[rgba(92,225,214,0.15)] text-sb-signal transition group-hover:scale-105"><Users size={24} /></span>
-            <span className="mb-1 text-base font-extrabold text-sb-soft">Practice Partners</span>
-            <span className="mb-4 flex-1 text-sm leading-relaxed text-sb-muted">Directory, matching, and partner messaging are not implemented.</span>
-            <span className="mt-auto flex items-center gap-1.5 text-sm font-bold text-sb-signal">Unavailable <ArrowRight size={14} /></span>
+            <span className="mb-1 text-base font-extrabold text-sb-soft">Human Practice</span>
+            <span className="mb-4 flex-1 text-sm leading-relaxed text-sb-muted">Explore illustrative practitioner profiles and save demo practice requests.</span>
+            <span className="mt-auto flex items-center gap-1.5 text-sm font-bold text-sb-signal">Explore demo directory <ArrowRight size={14} /></span>
           </button>
-          <button type="button" className="group relative flex flex-col rounded-2xl border border-[rgba(92,225,214,0.14)] bg-[rgba(24,48,65,0.7)] p-6 text-left text-sb-body shadow-sm backdrop-blur-xl transition duration-200 hover:-translate-y-1 hover:border-sb-signal hover:bg-[rgba(24,48,65,0.95)] hover:shadow-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sb-signal" onClick={() => setActiveNav('achievements')}>
+          <button type="button" className="group relative flex flex-col rounded-2xl border border-[rgba(92,225,214,0.14)] bg-[rgba(24,48,65,0.7)] p-6 text-left text-sb-body shadow-sm backdrop-blur-xl transition duration-200 hover:-translate-y-1 hover:border-sb-signal hover:bg-[rgba(24,48,65,0.95)] hover:shadow-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sb-signal" onClick={() => navigate('/credentials')}>
             <span className="mb-4 grid size-13 place-items-center rounded-2xl border border-[rgba(167,243,208,0.3)] bg-[rgba(167,243,208,0.12)] text-[#a7f3d0] transition group-hover:scale-105"><Shield size={24} /></span>
             <span className="mb-1 text-base font-extrabold text-sb-soft">Credentials</span>
             <span className="mb-4 flex-1 text-sm leading-relaxed text-sb-muted">Credential issuance and blockchain verification are not implemented.</span>
@@ -891,7 +1275,7 @@ export default function DashboardConnected({ user, onLogout }) {
   );
 
   const renderLessons = () => (
-    <div className="sb-curriculum-container mx-auto flex w-full max-w-[1400px] flex-col gap-8 p-5 sm:p-8 lg:px-9">
+    <div className="sb-curriculum-container mx-auto flex w-full max-w-350 flex-col gap-8 p-5 sm:p-8 lg:px-9">
       <ApiError>{pageError || lessonError}</ApiError>
       <header>
         <p className="sb-integration-eyebrow">Indian Sign Language</p>
@@ -1005,37 +1389,208 @@ export default function DashboardConnected({ user, onLogout }) {
   );
 
   const renderStudio = () => (
-    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-8 p-5 sm:p-8 lg:px-9">
+    <div className="mx-auto flex w-full max-w-350 flex-col gap-8 p-5 sm:p-8 lg:px-9">
       <header>
         <div className="sb-integration-section-heading">
-          <h1 className="sb-integration-page-title">Live Gesture Studio & AI Chat</h1>
-          <span className="sb-lesson-badge badge-active">Not implemented yet</span>
+          <h1 className="sb-integration-page-title">ISL Recognition Studio</h1>
+          <span className="sb-lesson-badge badge-active">Hosted recognition · experimental</span>
         </div>
         <p className="sb-integration-muted">
-          Sign recognition, sign-to-text translation, generated glosses, and AI chat are not available.
-          This page does not access your camera or send images or conversations to a third party.
+          MediaPipe processes camera frames locally. Jestally mode sends only a 30-frame landmark sequence.
+          The separate experimental ISL Bridge mode sends JPEG stills only after your explicit consent.
         </p>
       </header>
+      <div className="flex flex-wrap gap-3" role="group" aria-label="Recognition provider">
+        <button
+          type="button"
+          className={recognitionProviderMode === 'isl-bridge' ? primaryButton : outlineButton}
+          aria-pressed={recognitionProviderMode === 'isl-bridge'}
+          onClick={() => selectRecognitionProvider('isl-bridge')}
+        >
+          ISL Bridge · experimental
+        </button>
+        <button
+          type="button"
+          className={recognitionProviderMode === 'jestally' ? primaryButton : outlineButton}
+          aria-pressed={recognitionProviderMode === 'jestally'}
+          onClick={() => selectRecognitionProvider('jestally')}
+        >
+          Jestally · landmarks
+        </button>
+      </div>
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr_1fr]">
         <section className={columnCard}>
           <div className="sb-integration-section-heading">
-            <h2 className="flex items-center gap-2.5 text-lg font-extrabold text-sb-soft"><Video size={18} className="text-sb-signal" />Camera & Recognition</h2>
-            <span className="sb-integration-eyebrow">Coming soon</span>
+            <h2 className="flex items-center gap-2.5 text-lg font-extrabold text-sb-soft"><Camera size={18} className="text-sb-signal" />Camera & hand landmarks</h2>
+            <span className="sb-integration-eyebrow">Processed in browser</span>
           </div>
-          <div className="sb-demo-viewport sb-integration-empty">
-            <div>
+          <div className="sb-demo-viewport relative overflow-hidden">
+            <video
+              ref={cameraVideoRef}
+              className={`h-full w-full object-contain ${cameraStatus === 'active' ? 'scale-x-[-1]' : 'hidden'}`}
+              autoPlay
+              muted
+              playsInline
+              aria-label="Local webcam preview"
+            />
+            {cameraStatus !== 'active' && <div className="sb-integration-empty">
               <Video size={32} />
-              <h3>Recognition is not implemented</h3>
-              <p>No camera preview or recognition process is running.</p>
-            </div>
+              <h3>{cameraStatus === 'starting' ? 'Starting camera…' : 'Camera preview is off'}</h3>
+              <p>{cameraStatus === 'starting' ? 'Waiting for browser camera permission.' : 'Your camera starts only after you select Start camera.'}</p>
+            </div>}
           </div>
+          {cameraError && <ApiError>{cameraError}</ApiError>}
+          {landmarkerStatus === 'loading' && (
+            <p className="sb-integration-muted flex items-center gap-2" role="status"><Loader2 size={16} className="animate-spin" />Loading the local MediaPipe hand-landmark model…</p>
+          )}
+          {landmarkerError && <ApiError>{landmarkerError}</ApiError>}
           <div className="sb-prediction-hud">
-            <p><strong>Prediction:</strong> Unavailable</p>
-            <p><strong>Confidence:</strong> Not measured</p>
-            <button type="button" className={primaryButton} disabled>
-              <Video size={15} /> Start recognition
-            </button>
+            <p><strong>Detected hands:</strong> {landmarkerStatus === 'ready' ? detectedHandCount : 'Not available'}</p>
+            <p><strong>Landmarks:</strong> {detectedHandCount > 0 ? `${detectedHandCount} hand${detectedHandCount === 1 ? '' : 's'} · 21 points each · x, y, z` : 'No hand detected'}</p>
+            {recognitionProviderMode === 'jestally' && (
+              <p><strong>Recognition sequence:</strong> {recognitionFrameCount}/{RECOGNITION_FRAME_COUNT} frames</p>
+            )}
+            {cameraStatus === 'active' ? (
+              <button type="button" className={outlineButton} onClick={stopRecognitionCamera}>
+                <Video size={15} /> Stop camera
+              </button>
+            ) : (
+              <button type="button" className={primaryButton} onClick={startRecognitionCamera} disabled={cameraStatus === 'starting'}>
+                {cameraStatus === 'starting' ? <Loader2 size={15} className="animate-spin" /> : <Camera size={15} />}
+                {cameraStatus === 'starting' ? 'Starting…' : 'Start camera'}
+              </button>
+            )}
           </div>
+          {recognitionProviderMode === 'jestally' && (
+            <>
+              <label className="sb-integration-muted flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  checked={landmarkConsent}
+                  disabled={landmarkerStatus !== 'ready'}
+                  onChange={(event) => setLandmarkConsent(event.target.checked)}
+                />
+                <span>I agree to send this 30-frame landmark sequence to SignBridge and the hosted Jestally recognition service. Camera frames remain on this device.</span>
+              </label>
+              <button
+                type="button"
+                className={primaryButton}
+                onClick={recognizeCurrentSign}
+                disabled={!landmarkConsent || recognitionFrameCount !== RECOGNITION_FRAME_COUNT || landmarkerStatus !== 'ready' || recognitionRequestStatus === 'loading'}
+              >
+                {recognitionRequestStatus === 'loading' && <Loader2 size={15} className="animate-spin" />}
+                {recognitionRequestStatus === 'loading' ? 'Recognizing with Jestally…' : 'Recognize with Jestally'}
+              </button>
+              {recognitionRequestStatus === 'loading' && (
+                <p className="sb-integration-muted flex items-center gap-2" role="status"><Loader2 size={16} className="animate-spin" />Sending landmark sequence to Jestally…</p>
+              )}
+              {recognitionMessage && recognitionRequestStatus === 'error' && (
+                <ApiError>{recognitionMessage}</ApiError>
+              )}
+              {recognitionMessage && recognitionRequestStatus === 'abstained' && (
+                <p className="sb-integration-muted" role="status">{recognitionMessage}</p>
+              )}
+              {recognitionPrediction && (
+                <div className="sb-prediction-hud" aria-live="polite">
+                  <p><strong>Recognized sign:</strong> {recognitionPrediction.sign.replaceAll('_', ' ')}</p>
+                  <p><strong>Provider confidence:</strong> {(recognitionPrediction.confidence * 100).toFixed(1)}%</p>
+                  {recognitionPrediction.top3?.length > 0 && (
+                    <div>
+                      <p><strong>Top alternatives:</strong></p>
+                      <ol className="list-inside list-decimal">
+                        {recognitionPrediction.top3.map((alternative, index) => (
+                          <li key={`${alternative.sign}-${index}`}>
+                            {alternative.sign.replaceAll('_', ' ')} · {(alternative.confidence * 100).toFixed(1)}%
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
+                  <p className="sb-integration-muted">Experimental provider output; confidence is not a guarantee of correctness.</p>
+                </div>
+              )}
+              <p className="sb-integration-muted">
+                The MediaPipe runtime is downloaded from jsDelivr and its hand-landmark model from Google-hosted
+                storage. They process frames in this browser; only normalized hand coordinates go to Jestally
+                after consent.
+              </p>
+            </>
+          )}
+          {recognitionProviderMode === 'isl-bridge' && (
+            <section className="rounded-2xl border border-[rgba(92,225,214,0.22)] bg-[rgba(10,25,38,0.5)] p-5">
+            <div className="sb-integration-section-heading">
+              <h3 className="text-base font-extrabold text-sb-soft">Experimental ISL Bridge · live recognition</h3>
+              <span className="sb-integration-eyebrow" role="status">
+                {islBridgeIsRunning ? '● Live recognition' : 'Stopped'}
+              </span>
+            </div>
+            <p className="sb-integration-muted">
+              Start the camera and grant consent before recognition can begin. While active, one
+              resized JPEG frame is sampled every 700 ms and sent through SignBridge to the public
+              demo. If a request is still in flight, that sampling cycle is skipped.
+            </p>
+            <label className="sb-integration-muted flex items-start gap-2">
+              <input
+                type="checkbox"
+                checked={islBridgeConsent}
+                disabled={cameraStatus !== 'active'}
+                onChange={(event) => setIslBridgeConsent(event.target.checked)}
+              />
+              <span>I agree to send camera frames to the experimental ISL Bridge demo for recognition. The provider's processing and retention are outside SignBridge's control.</span>
+            </label>
+            <div className="flex flex-wrap items-center gap-3">
+              {!islBridgeIsRunning ? (
+                <button
+                  type="button"
+                  className={primaryButton}
+                  onClick={startContinuousIslBridgeRecognition}
+                  disabled={!islBridgeConsent || cameraStatus !== 'active'}
+                >
+                  <Radio size={15} /> Start recognition
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className={outlineButton}
+                  onClick={stopContinuousIslBridgeRecognition}
+                >
+                  Stop recognition
+                </button>
+              )}
+            </div>
+            {islBridgeStatus === 'loading' && islBridgeIsRunning && (
+              <p className="sb-integration-muted flex items-center gap-2" role="status">
+                <Loader2 size={16} className="animate-spin" />
+                Sending the latest camera frame for recognition…
+              </p>
+            )}
+            {islBridgeStatus === 'running' && islBridgeIsRunning && (
+              <p className="sb-integration-muted" role="status">Recognition is active. Waiting for the next sample.</p>
+            )}
+            {islBridgeStatus === 'error' && <ApiError>{islBridgeError}</ApiError>}
+            {islBridgeStatus === 'empty' && (
+              <p className="sb-integration-muted" role="status">
+                ISL Bridge returned no sign, word, or sentence for the latest frame. Try holding a supported sign steadily.
+              </p>
+            )}
+            {islBridgeResult && (
+              <div className="sb-prediction-hud" aria-live="polite">
+                <p><strong>Sign:</strong> {islBridgeResult.sign || 'No sign returned'}</p>
+                <p><strong>Word:</strong> {islBridgeResult.word || 'No word returned'}</p>
+                <p><strong>Sentence:</strong> {islBridgeResult.sentence || 'No sentence returned'}</p>
+                <p className="sb-integration-muted">Latest meaningful provider result. The provider sentence is shown as returned; this is experimental, not continuous ISL translation.</p>
+              </div>
+            )}
+            {islBridgeLatencyMs !== null && (
+              <p className="sb-integration-muted" aria-live="polite">Latest request latency: {islBridgeLatencyMs} ms</p>
+            )}
+            <p className="sb-integration-muted">
+              The JPEG frames are uploaded to the third-party demo after your action. Do not capture sensitive
+              scenes. This provider may have shared in-memory state between visitors; results can be delayed
+              or affected by concurrent use.
+            </p>
+            </section>
+          )}
         </section>
         <section className={columnCard}>
           <div className="sb-integration-section-heading">
@@ -1072,7 +1627,7 @@ export default function DashboardConnected({ user, onLogout }) {
   );
 
   const renderCommunity = () => (
-    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-8 p-5 sm:p-8 lg:px-9">
+    <div className="mx-auto flex w-full max-w-350 flex-col gap-8 p-5 sm:p-8 lg:px-9">
       <header>
         <div className="sb-integration-section-heading">
           <h1 className="sb-integration-page-title">Practice Partners & ISL Community</h1>
@@ -1098,7 +1653,7 @@ export default function DashboardConnected({ user, onLogout }) {
         <button className={outlineButton} type="button" disabled>ISL practitioners</button>
         <button className={outlineButton} type="button" disabled>Practice peers</button>
       </div>
-      <section className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-[rgba(92,225,214,0.14)] p-8 text-center text-[#8197ab]">
+      <section className="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-[rgba(92,225,214,0.14)] p-8 text-center text-sb-muted">
         <Users size={30} />
         <h2>No partner results</h2>
         <p>Partner profiles and matching will appear here only after a real, consent-based service exists.</p>
@@ -1114,15 +1669,14 @@ export default function DashboardConnected({ user, onLogout }) {
   );
 
   const renderAchievements = () => (
-    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-8 p-5 sm:p-8 lg:px-9">
+    <div className="mx-auto flex w-full max-w-350 flex-col gap-8 p-5 sm:p-8 lg:px-9">
       <header>
         <div className="sb-integration-section-heading">
-          <h1 className="sb-integration-page-title">Milestones & Credentials</h1>
-          <span className="sb-lesson-badge badge-active">Blockchain not implemented</span>
+          <h1 className="sb-integration-page-title">Milestones</h1>
+          <span className="sb-lesson-badge badge-active">Credential details</span>
         </div>
         <p className="sb-integration-muted">
-          Your published lesson completions are available below. No certificates, on-chain proofs,
-          transaction hashes, wallet addresses, recognition awards, or XP totals have been issued.
+          Your published lesson completions are available below. View testnet credential eligibility and proofs on the Credentials page.
         </p>
       </header>
       <div className="my-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -1138,8 +1692,8 @@ export default function DashboardConnected({ user, onLogout }) {
         </article>
         <article className={`${cardSurface} flex min-w-0 flex-col items-start gap-4 p-6`}>
           <span className="sb-metric-icon icon-light-bg"><FileCheck size={22} /></span>
-          <span className="break-all text-2xl font-extrabold text-sb-signal">Not issued</span>
-          <span className="text-xs font-semibold text-sb-muted">Verifiable credentials</span>
+          <span className="break-all text-2xl font-extrabold text-sb-signal">View credentials</span>
+          <span className="text-xs font-semibold text-sb-muted">MST Coral testnet</span>
         </article>
       </div>
       <section>
@@ -1150,13 +1704,10 @@ export default function DashboardConnected({ user, onLogout }) {
           <span className="sb-chain-verified-pill sb-integration-unavailable-pill">
             <AlertCircle size={14} /> Not implemented
           </span>
-          <h3>Credential issuance and verification are unavailable</h3>
-          <p>
-            No certificate has been issued or verified by this application. The backend has no
-            blockchain contract or credential verification service.
-          </p>
-          <button type="button" className={outlineButton} disabled>
-            <Shield size={14} /> Verify credential
+          <h3>Credential issuance is available from the Credentials page</h3>
+          <p>Check eligibility, request a testnet credential, view transaction status, and share a public verification link.</p>
+          <button type="button" className={outlineButton} onClick={() => navigate('/credentials')}>
+            <Shield size={14} /> Open credentials
           </button>
         </article>
       </section>
@@ -1182,13 +1733,13 @@ export default function DashboardConnected({ user, onLogout }) {
       </section>
       <div className="sb-integration-contract">
         <Database size={18} />
-        <span>Future credential proofs may be stored on-chain only after implementation; private information and conversations must remain off-chain.</span>
+        <span>Credential hashes only are stored on-chain. Private information and conversations remain off-chain.</span>
       </div>
     </div>
   );
 
   const renderSettings = () => (
-    <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-8 p-5 sm:p-8 lg:px-9">
+    <div className="mx-auto flex w-full max-w-350 flex-col gap-8 p-5 sm:p-8 lg:px-9">
       <header>
         <h1 className="sb-integration-page-title">Profile & Settings</h1>
         <p className="sb-integration-muted">Update profile preferences and privacy consent saved to your account.</p>
@@ -1204,7 +1755,7 @@ export default function DashboardConnected({ user, onLogout }) {
           <button
             className={`flex shrink-0 items-center gap-2 rounded-xl border px-4 py-2.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sb-signal ${
               settingsSubTab === id
-                ? 'border-transparent bg-gradient-to-br from-sb-violet to-sb-signal font-extrabold text-sb-midnight shadow-md'
+                ? 'border-transparent bg-linear-to-br from-sb-violet to-sb-signal font-extrabold text-sb-midnight shadow-md'
                 : 'border-transparent bg-transparent font-semibold text-sb-muted hover:bg-[rgba(7,20,33,0.5)] hover:text-sb-soft'
             }`}
             type="button"
@@ -1314,7 +1865,7 @@ export default function DashboardConnected({ user, onLogout }) {
   );
 
   return (
-    <div className="flex min-h-screen overflow-x-hidden bg-[#071421] bg-[radial-gradient(at_0%_0%,rgba(146,117,255,0.12)_0px,transparent_45%),radial-gradient(at_100%_100%,rgba(92,225,214,0.1)_0px,transparent_45%)] text-[#c9d9e8]">
+    <div className="flex min-h-screen overflow-x-hidden bg-sb-midnight bg-[radial-gradient(at_0%_0%,rgba(146,117,255,0.12)_0px,transparent_45%),radial-gradient(at_100%_100%,rgba(92,225,214,0.1)_0px,transparent_45%)] text-sb-body">
       <AppSidebar
         activeNav={activeNav}
         user={profile}
@@ -1324,7 +1875,7 @@ export default function DashboardConnected({ user, onLogout }) {
 
       <main className="flex h-screen min-w-0 flex-1 flex-col overflow-y-auto bg-transparent">
         <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-[rgba(92,225,214,0.14)] bg-[rgba(7,20,33,0.85)] px-5 py-4 backdrop-blur-xl max-sm:flex-wrap sm:px-8">
-          <label className="sb-nav-search !w-full max-w-[340px] max-md:max-w-[180px]">
+          <label className="sb-nav-search w-full! max-w-85 max-md:max-w-45">
             <Search size={16} />
             <input
               type="search"

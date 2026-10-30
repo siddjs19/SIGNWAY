@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import QuizPage from './pages/QuizPage';
+import PractitionersPage from './pages/PractitionersPage';
+import CredentialsPage, { PublicCredentialVerificationPage } from './pages/CredentialsPage';
 import api, { clearStoredToken, getStoredToken } from './services/api';
 import authService from './services/authService';
 
@@ -16,6 +18,7 @@ export default function App() {
 }
 
 function SignBridgeApplication() {
+  const location = useLocation();
   const [authView, setAuthView] = useState('login');
   const [currentUser, setCurrentUser] = useState(null);
   const [checkingSession, setCheckingSession] = useState(true);
@@ -60,9 +63,18 @@ function SignBridgeApplication() {
 
   if (checkingSession) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#071421] p-6 text-[#c9d9e8]">
+      <main className="flex min-h-screen items-center justify-center bg-sb-midnight p-6 text-sb-body">
         <p role="status">Checking your session…</p>
       </main>
+    );
+  }
+
+  if (location.pathname.startsWith('/verify/')) {
+    return (
+      <Routes>
+        <Route path="/verify/:credentialId" element={<PublicCredentialVerificationPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     );
   }
 
@@ -73,6 +85,8 @@ function SignBridgeApplication() {
         <Route path="/quiz" element={<QuizPage user={currentUser} onLogout={handleLogout} />} />
         <Route path="/quiz/lesson/:lessonId" element={<QuizPage user={currentUser} onLogout={handleLogout} />} />
         <Route path="/quiz/full-course" element={<QuizPage user={currentUser} onLogout={handleLogout} />} />
+        <Route path="/practitioners" element={<PractitionersPage user={currentUser} onLogout={handleLogout} />} />
+        <Route path="/credentials" element={<CredentialsPage user={currentUser} onLogout={handleLogout} />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );

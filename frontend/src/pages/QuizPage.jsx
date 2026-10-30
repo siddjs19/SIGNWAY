@@ -461,7 +461,7 @@ export default function QuizPage({ user, onLogout }) {
                   }
                   return { ...previous, [currentQuestionData._id]: next };
                 })}
-                className="mt-0.5 accent-[#5ce1d6]"
+                className="mt-0.5 accent-sb-signal"
               />
               <span>{option}</span>
             </label>
@@ -644,7 +644,7 @@ export default function QuizPage({ user, onLogout }) {
   };
 
   return (
-    <div className="flex h-screen min-w-0 overflow-hidden bg-[#071421] bg-[radial-gradient(at_0%_0%,rgba(146,117,255,0.12)_0px,transparent_45%),radial-gradient(at_100%_100%,rgba(92,225,214,0.1)_0px,transparent_45%)] text-[#c9d9e8]">
+    <div className="flex h-screen min-w-0 overflow-hidden bg-sb-midnight bg-[radial-gradient(at_0%_0%,rgba(146,117,255,0.12)_0px,transparent_45%),radial-gradient(at_100%_100%,rgba(92,225,214,0.1)_0px,transparent_45%)] text-sb-body">
       <AppSidebar
         activeNav="quizzes"
         user={user}

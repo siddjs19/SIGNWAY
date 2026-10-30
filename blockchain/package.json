@@ -1,0 +1,20 @@
+{
+  "name": "signbridge-mst-credentials",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:coral": "hardhat run scripts/deploy.js --network coral",
+    "export-abi": "hardhat run scripts/export-abi.js"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-chai-matchers": "^2.1.0",
+    "@nomicfoundation/hardhat-ethers": "^3.1.0",
+    "@openzeppelin/contracts": "^5.4.0",
+    "chai": "^4.5.0",
+    "dotenv": "^16.4.7",
+    "ethers": "^6.14.0",
+    "hardhat": "^2.26.3"
+  }
+}
