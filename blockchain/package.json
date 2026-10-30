@@ -1,0 +1,15 @@
+{
+  "name": "signbridge-credential-contracts",
+  "private": true,
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:mst": "hardhat run scripts/deploy.js --network mst"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "dotenv": "^16.4.7",
+    "hardhat": "^2.22.17",
+    "@openzeppelin/contracts": "^5.2.0"
+  }
+}

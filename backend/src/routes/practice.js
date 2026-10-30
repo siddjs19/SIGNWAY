@@ -1,0 +1,3 @@
+const router=require('express').Router();const auth=require('../middleware/auth');const PracticeRequest=require('../models/PracticeRequest');router.use(auth);
+router.get('/requests',async(req,res)=>{const data=await PracticeRequest.find({user:req.user._id}).sort({createdAt:-1}).lean();res.json({success:true,data})});
+router.post('/requests',async(req,res)=>{const label=String(req.body.practitionerLabel||'Practice request').slice(0,120);const note=String(req.body.note||'').slice(0,1000);const data=await PracticeRequest.create({user:req.user._id,practitionerLabel:label,note});res.status(201).json({success:true,data})});module.exports=router;

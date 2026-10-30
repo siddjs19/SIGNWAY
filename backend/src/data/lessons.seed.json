@@ -1,0 +1,786 @@
+[
+  {
+    "title": "ISL Foundations",
+    "slug": "isl-foundations",
+    "description": "Understand what Indian Sign Language is and how visual communication works.",
+    "learningObjective": "Recognize and practise foundations vocabulary using the available demonstrations.",
+    "category": "Foundations",
+    "level": "beginner",
+    "order": 1,
+    "durationMinutes": 14,
+    "published": true,
+    "signs": [
+      {
+        "term": "Hello",
+        "gloss": "HELLO",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Hello.mp4",
+        "assetId": "hello",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Welcome",
+        "gloss": "WELCOME",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Welcome.mp4",
+        "assetId": "welcome",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Thank You",
+        "gloss": "THANK_YOU",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Thank You.mp4",
+        "assetId": "thank-you",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Bye",
+        "gloss": "BYE",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Bye.mp4",
+        "assetId": "bye",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Help",
+        "gloss": "HELP",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Help.mp4",
+        "assetId": "help",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Language",
+        "gloss": "LANGUAGE",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Language.mp4",
+        "assetId": "language",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Sign",
+        "gloss": "SIGN",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Sign.mp4",
+        "assetId": "sign",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      }
+    ],
+    "videoUrl": "/assets/videos/isl/library/Hello.mp4"
+  },
+  {
+    "title": "Alphabet and Fingerspelling",
+    "slug": "alphabet-and-fingerspelling",
+    "description": "Explore the available alphabet clips and practise fingerspelling at your own pace.",
+    "learningObjective": "Recognize and practise fingerspelling vocabulary using the available demonstrations.",
+    "category": "Fingerspelling",
+    "level": "beginner",
+    "order": 2,
+    "durationMinutes": 52,
+    "published": true,
+    "signs": [
+      {
+        "term": "A",
+        "gloss": "A",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/A.mp4",
+        "assetId": "a",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "B",
+        "gloss": "B",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/B.mp4",
+        "assetId": "b",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "C",
+        "gloss": "C",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/C.mp4",
+        "assetId": "c",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "D",
+        "gloss": "D",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/D.mp4",
+        "assetId": "d",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "E",
+        "gloss": "E",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/E.mp4",
+        "assetId": "e",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "F",
+        "gloss": "F",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/F.mp4",
+        "assetId": "f",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "G",
+        "gloss": "G",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/G.mp4",
+        "assetId": "g",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "H",
+        "gloss": "H",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/H.mp4",
+        "assetId": "h",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "I",
+        "gloss": "I",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/I.mp4",
+        "assetId": "i",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "J",
+        "gloss": "J",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/J.mp4",
+        "assetId": "j",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "K",
+        "gloss": "K",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/K.mp4",
+        "assetId": "k",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "L",
+        "gloss": "L",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/L.mp4",
+        "assetId": "l",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "M",
+        "gloss": "M",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/M.mp4",
+        "assetId": "m",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "N",
+        "gloss": "N",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/N.mp4",
+        "assetId": "n",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "O",
+        "gloss": "O",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/O.mp4",
+        "assetId": "o",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "P",
+        "gloss": "P",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/P.mp4",
+        "assetId": "p",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Q",
+        "gloss": "Q",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Q.mp4",
+        "assetId": "q",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "R",
+        "gloss": "R",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/R.mp4",
+        "assetId": "r",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "S",
+        "gloss": "S",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/S.mp4",
+        "assetId": "s",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "T",
+        "gloss": "T",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/T.mp4",
+        "assetId": "t",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "U",
+        "gloss": "U",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/U.mp4",
+        "assetId": "u",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "V",
+        "gloss": "V",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/V.mp4",
+        "assetId": "v",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "W",
+        "gloss": "W",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/W.mp4",
+        "assetId": "w",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "X",
+        "gloss": "X",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/X.mp4",
+        "assetId": "x",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Y",
+        "gloss": "Y",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Y.mp4",
+        "assetId": "y",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Z",
+        "gloss": "Z",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Z.mp4",
+        "assetId": "z",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      }
+    ],
+    "videoUrl": "/assets/videos/isl/library/A.mp4"
+  },
+  {
+    "title": "Numbers and Counting",
+    "slug": "numbers-and-counting",
+    "description": "Practise number signs where matching video assets are available.",
+    "learningObjective": "Recognize and practise numbers vocabulary using the available demonstrations.",
+    "category": "Numbers",
+    "level": "beginner",
+    "order": 3,
+    "durationMinutes": 20,
+    "published": true,
+    "signs": [
+      {
+        "term": "0",
+        "gloss": "0",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/0.mp4",
+        "assetId": "0",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "1",
+        "gloss": "1",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/1.mp4",
+        "assetId": "1",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "2",
+        "gloss": "2",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/2.mp4",
+        "assetId": "2",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "3",
+        "gloss": "3",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/3.mp4",
+        "assetId": "3",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "4",
+        "gloss": "4",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/4.mp4",
+        "assetId": "4",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "5",
+        "gloss": "5",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/5.mp4",
+        "assetId": "5",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "6",
+        "gloss": "6",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/6.mp4",
+        "assetId": "6",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "7",
+        "gloss": "7",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/7.mp4",
+        "assetId": "7",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "8",
+        "gloss": "8",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/8.mp4",
+        "assetId": "8",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "9",
+        "gloss": "9",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/9.mp4",
+        "assetId": "9",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      }
+    ],
+    "videoUrl": "/assets/videos/isl/library/0.mp4"
+  },
+  {
+    "title": "Greetings and Introductions",
+    "slug": "greetings-and-introductions",
+    "description": "Learn common greetings and simple introductory vocabulary.",
+    "learningObjective": "Recognize and practise greetings vocabulary using the available demonstrations.",
+    "category": "Greetings",
+    "level": "beginner",
+    "order": 4,
+    "durationMinutes": 16,
+    "published": true,
+    "signs": [
+      {
+        "term": "Hello",
+        "gloss": "HELLO",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Hello.mp4",
+        "assetId": "hello",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Welcome",
+        "gloss": "WELCOME",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Welcome.mp4",
+        "assetId": "welcome",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Bye",
+        "gloss": "BYE",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Bye.mp4",
+        "assetId": "bye",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Thank You",
+        "gloss": "THANK_YOU",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Thank You.mp4",
+        "assetId": "thank-you",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "How",
+        "gloss": "HOW",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/How.mp4",
+        "assetId": "how",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "What",
+        "gloss": "WHAT",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/What.mp4",
+        "assetId": "what",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Who",
+        "gloss": "WHO",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Who.mp4",
+        "assetId": "who",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Name",
+        "gloss": "NAME",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Name.mp4",
+        "assetId": "name",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      }
+    ],
+    "videoUrl": "/assets/videos/isl/library/Hello.mp4"
+  },
+  {
+    "title": "Everyday Vocabulary",
+    "slug": "everyday-vocabulary",
+    "description": "Build vocabulary for common daily contexts.",
+    "learningObjective": "Recognize and practise everyday vocabulary using the available demonstrations.",
+    "category": "Everyday",
+    "level": "beginner",
+    "order": 5,
+    "durationMinutes": 22,
+    "published": true,
+    "signs": [
+      {
+        "term": "Eat",
+        "gloss": "EAT",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Eat.mp4",
+        "assetId": "eat",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Home",
+        "gloss": "HOME",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Home.mp4",
+        "assetId": "home",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Work",
+        "gloss": "WORK",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Work.mp4",
+        "assetId": "work",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Study",
+        "gloss": "STUDY",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Study.mp4",
+        "assetId": "study",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "College",
+        "gloss": "COLLEGE",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/College.mp4",
+        "assetId": "college",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Time",
+        "gloss": "TIME",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Time.mp4",
+        "assetId": "time",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Again",
+        "gloss": "AGAIN",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Again.mp4",
+        "assetId": "again",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Good",
+        "gloss": "GOOD",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Good.mp4",
+        "assetId": "good",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Beautiful",
+        "gloss": "BEAUTIFUL",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Beautiful.mp4",
+        "assetId": "beautiful",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Best",
+        "gloss": "BEST",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Best.mp4",
+        "assetId": "best",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Busy",
+        "gloss": "BUSY",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Busy.mp4",
+        "assetId": "busy",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      }
+    ],
+    "videoUrl": "/assets/videos/isl/library/Eat.mp4"
+  },
+  {
+    "title": "Pronouns and Questions",
+    "slug": "pronouns-and-questions",
+    "description": "Explore question words and common pronouns.",
+    "learningObjective": "Recognize and practise questions vocabulary using the available demonstrations.",
+    "category": "Questions",
+    "level": "beginner",
+    "order": 6,
+    "durationMinutes": 24,
+    "published": true,
+    "signs": [
+      {
+        "term": "I",
+        "gloss": "I",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/I.mp4",
+        "assetId": "i",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "You",
+        "gloss": "YOU",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/You.mp4",
+        "assetId": "you",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "We",
+        "gloss": "WE",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/We.mp4",
+        "assetId": "we",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "My",
+        "gloss": "MY",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/My.mp4",
+        "assetId": "my",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Your",
+        "gloss": "YOUR",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Your.mp4",
+        "assetId": "your",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Who",
+        "gloss": "WHO",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Who.mp4",
+        "assetId": "who",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "What",
+        "gloss": "WHAT",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/What.mp4",
+        "assetId": "what",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Where",
+        "gloss": "WHERE",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Where.mp4",
+        "assetId": "where",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "When",
+        "gloss": "WHEN",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/When.mp4",
+        "assetId": "when",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Why",
+        "gloss": "WHY",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Why.mp4",
+        "assetId": "why",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Which",
+        "gloss": "WHICH",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Which.mp4",
+        "assetId": "which",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "How",
+        "gloss": "HOW",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/How.mp4",
+        "assetId": "how",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      }
+    ],
+    "videoUrl": "/assets/videos/isl/library/I.mp4"
+  },
+  {
+    "title": "Everyday Communication",
+    "slug": "everyday-communication",
+    "description": "Practise with individual available word clips. This is not a validated sentence grammar course.",
+    "learningObjective": "Recognize and practise conversation vocabulary using the available demonstrations.",
+    "category": "Conversation",
+    "level": "beginner",
+    "order": 7,
+    "durationMinutes": 16,
+    "published": true,
+    "signs": [
+      {
+        "term": "Ask",
+        "gloss": "ASK",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Ask.mp4",
+        "assetId": "ask",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Talk",
+        "gloss": "TALK",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Talk.mp4",
+        "assetId": "talk",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Can",
+        "gloss": "CAN",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Can.mp4",
+        "assetId": "can",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Cannot",
+        "gloss": "CANNOT",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Cannot.mp4",
+        "assetId": "cannot",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Do",
+        "gloss": "DO",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Do.mp4",
+        "assetId": "do",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Not",
+        "gloss": "NOT",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Not.mp4",
+        "assetId": "not",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Go",
+        "gloss": "GO",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Go.mp4",
+        "assetId": "go",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Come",
+        "gloss": "COME",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Come.mp4",
+        "assetId": "come",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      }
+    ],
+    "videoUrl": "/assets/videos/isl/library/Ask.mp4"
+  },
+  {
+    "title": "Emergency Communication",
+    "slug": "emergency-communication",
+    "description": "Explore available help and safety-related vocabulary.",
+    "learningObjective": "Recognize and practise safety vocabulary using the available demonstrations.",
+    "category": "Safety",
+    "level": "beginner",
+    "order": 8,
+    "durationMinutes": 5,
+    "published": true,
+    "signs": [
+      {
+        "term": "Help",
+        "gloss": "HELP",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Help.mp4",
+        "assetId": "help",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      },
+      {
+        "term": "Safe",
+        "gloss": "SAFE",
+        "meaning": "Vocabulary meaning; linguistic explanation pending educator review.",
+        "videoUrl": "/assets/videos/isl/library/Safe.mp4",
+        "assetId": "safe",
+        "reviewStatus": "source_asset_not_linguistically_reviewed"
+      }
+    ],
+    "videoUrl": "/assets/videos/isl/library/Help.mp4"
+  }
+]

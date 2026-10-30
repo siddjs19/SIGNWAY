@@ -1,0 +1,6 @@
+const router=require('express').Router();const auth=require('../middleware/auth');const Lesson=require('../models/Lesson');const LessonProgress=require('../models/LessonProgress');
+router.get('/',auth,async(req,res)=>{const data=await Lesson.find({published:true}).sort({order:1}).lean();res.json({success:true,data})});
+router.get('/progress/me',auth,async(req,res)=>{const data=await LessonProgress.find({user:req.user._id}).populate('lesson','title slug category').sort({completedAt:-1}).lean();res.json({success:true,data})});
+router.get('/:id',auth,async(req,res)=>{const data=await Lesson.findOne({_id:req.params.id,published:true}).lean();if(!data)return res.status(404).json({success:false,message:'Lesson not found'});res.json({success:true,data})});
+router.post('/:id/complete',auth,async(req,res)=>{const lesson=await Lesson.findOne({_id:req.params.id,published:true});if(!lesson)return res.status(404).json({success:false,message:'Lesson not found'});await LessonProgress.updateOne({user:req.user._id,lesson:lesson._id},{$setOnInsert:{completedAt:new Date()}},{upsert:true});const data=await LessonProgress.find({user:req.user._id}).populate('lesson','title slug category').sort({completedAt:-1}).lean();res.json({success:true,data})});
+module.exports=router;
