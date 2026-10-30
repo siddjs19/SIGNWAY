@@ -205,7 +205,7 @@ export default function Communicator () {
               <MessageCircle />
             </div>
             <div>
-              <b>SignBridge AI Tutor</b>
+              <b>SIGNWAY Tutor</b>
               <small>ISL learning assistant · Groq</small>
             </div>
             <Status tone='success'>Ready</Status>

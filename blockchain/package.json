@@ -1,5 +1,5 @@
 {
-  "name": "signbridge-credential-contracts",
+  "name": "signway-credential-contracts",
   "private": true,
   "scripts": {
     "compile": "hardhat compile",
